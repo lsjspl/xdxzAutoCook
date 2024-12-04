@@ -8,8 +8,8 @@ import keyboard
 import tkinter as tk
 import queue
 
-debug = True
-threshold = 0.8  # 设置匹配的阈值
+debug = False
+threshold = 0.75  # 设置匹配的阈值
 
 # 获取脚本所在的目录
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -59,7 +59,7 @@ def show_match_result(screen, template, match_position, template_size):
     cv2.rectangle(screen, (left, top), bottom_right, (0, 255, 0), 2)
 
     # 显示匹配的屏幕截图和模板
-    cv2.imshow("Matched Screen", screen)
+    # cv2.imshow("Matched Screen", screen)
     cv2.imshow("Template", template)
     cv2.waitKey(0)
     cv2.destroyAllWindows()    
@@ -83,10 +83,7 @@ def preprocess_image_white_only(image_path):
     gray_template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
 
     # 创建一个掩模，只保留白色部分
-    _, mask = cv2.threshold(gray_template, 250, 255, cv2.THRESH_BINARY)  # 假设白色部分是高亮部分，阈值可以调整
-
-    # 将掩模应用到 alpha 通道，保留白色区域，其他部分设置为透明
-    template[:, :, 3] = mask  # 将mask赋给alpha通道
+    _, mask = cv2.threshold(gray_template, 230, 255, cv2.THRESH_BINARY)  # 假设白色部分是高亮部分，阈值可以调整
 
     return template, gray_template
 
@@ -161,7 +158,7 @@ def handler():
 
                 if debug:
                     print(f"找到按钮{icon}位置：{match_position}")
-                    show_match_result(screen, template, (left, top), (width, height))
+                    show_match_result(screen, gray_template, (left, top), (width, height))
                 threading.Thread(target=draw_rectangle, args=(left, top, width, height, 0.5)).start()
 
                 # 获取按钮的中心点
