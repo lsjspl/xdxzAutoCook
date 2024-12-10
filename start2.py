@@ -1,201 +1,201 @@
 import cv2
-import pyautogui
 import numpy as np
+import pyautogui
 import threading
-import os
 import time
+import os
 import keyboard
 import tkinter as tk
 import queue
+import pygetwindow as gw  # 导入窗口管理库
 
-debug = False
-threshold = 0.75  # 设置匹配的阈值
+debug = True  # 是否开启调试模式
+threshold = 0.8  # 匹配的阈值
 
-# 获取脚本所在的目录
 script_dir = os.path.dirname(os.path.abspath(__file__))
 print(f"脚本目录：{script_dir}")
 
 icons = [f"{script_dir}\\cook.png", f"{script_dir}\\cook_menu.png", f"{script_dir}\\cook_start.png", f"{script_dir}\\finish.png"]
 
-def draw_rectangle(left, top, width, height, duration=5):
-    # 创建一个全屏透明窗口
-    root = tk.Tk()
-    root.overrideredirect(True)  # 去掉窗口边框
-    root.attributes('-topmost', True)  # 窗口置顶
-    root.attributes('-transparentcolor', 'black')  # 设置透明背景
+# 创建显示队列
+image_queue = queue.Queue()
 
-    # 设置窗口大小为屏幕大小
+def show_images():
+    """ 主线程显示图像窗口的逻辑，通过队列从子线程接收图像。 """
+    while True:
+        if not image_queue.empty():
+            title, image = image_queue.get()
+            if image is None:  # 退出信号q
+                break
+            cv2.imshow(title, image)
+            cv2.waitKey(1)  # 非阻塞等待
+    cv2.destroyAllWindows()
+
+def draw_rectangle(left, top, width, height, duration=5):
+    """ 绘制一个绿色矩形框在屏幕指定位置。 """
+    root = tk.Tk()
+    root.overrideredirect(True)
+    root.attributes('-topmost', True)
+    root.attributes('-transparentcolor', 'black')
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
     canvas = tk.Canvas(root, width=screen_width, height=screen_height, bg='black', highlightthickness=0)
     canvas.pack()
-
-    # 绘制绿色矩形框
-    x1, y1 = left, top
-    x2, y2 = left + width, top + height
-    canvas.create_rectangle(x1, y1, x2, y2, outline="green", width=3)
-
-    # 在指定时间后关闭窗口
+    canvas.create_rectangle(left, top, left + width, top + height, outline="green", width=3)
     root.after(int(duration * 1000), root.destroy)
-
-    # 启动 tkinter 主循环（在主线程中运行）
     root.mainloop()
 
-def show_match_result(screen, template, match_position, template_size):
-    """
-    在屏幕截图上绘制矩形框并显示匹配结果。
-    
-    Parameters:
-    - screen (ndarray): 屏幕截图图像。
-    - template (ndarray): 模板图像。
-    - match_position (tuple): 匹配位置的左上角坐标 (x, y)。
-    - template_size (tuple): 模板图像的大小 (宽度, 高度)。
-    """
-    left, top = match_position
-    width, height = template_size
-
-    # 在匹配的屏幕截图上绘制矩形框
-    bottom_right = (left + width, top + height)
-    cv2.rectangle(screen, (left, top), bottom_right, (0, 255, 0), 2)
-
-    # 显示匹配的屏幕截图和模板
-    # cv2.imshow("Matched Screen", screen)
-    cv2.imshow("Template", template)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()    
-
-def preprocess_image_white_only(image_path):
-    """
-    读取模板图像并保留白色部分，其他部分变为黑色。
-    
-    Parameters:
-    - image_path (str): 模板图像的路径
-    
-    Returns:
-    - processed_image (ndarray): 只保留白色部分的图像
-    """
-    # 读取图像
+def preprocess_image_with_mask(image_path):
+    """ 读取模板图像并提取其白色区域生成掩码。 """
     template = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
     if template is None:
         raise ValueError(f"无法读取图片 {image_path}，请检查路径。")
-
-    # 转换为灰度图
+    
     gray_template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+    _, mask = cv2.threshold(gray_template, 220, 255, cv2.THRESH_BINARY)
+    masked_template = cv2.bitwise_and(template, template, mask=mask)
 
-    # 创建一个掩模，只保留白色部分
-    _, mask = cv2.threshold(gray_template, 230, 255, cv2.THRESH_BINARY)  # 假设白色部分是高亮部分，阈值可以调整
-
-    return template, gray_template
+    if debug:
+        image_queue.put(("---",masked_template))
 
 
+    return masked_template, mask
 
-def match_template_scaled(icon, gray_screen, threshold, result_queue):
-    """
-    为每个缩放比例进行模板匹配，并返回匹配结果。
+def get_window_screenshot(window_title):
+    """ 获取特定窗口的截图。 """
+    window = gw.getWindowsWithTitle(window_title)
+    if not window:
+        raise ValueError(f"未找到窗口标题为 '{window_title}' 的窗口。")
     
-    Parameters:
-    - icon (str): 图标文件路径。
-    - gray_screen (ndarray): 截图的灰度图。
-    - threshold (float): 匹配的阈值。
-    
-    Returns:
-    - tuple: 如果匹配成功，返回左上角位置、宽高和模板，其他返回None。
-    """
-    template, gray_template = preprocess_image_white_only(icon)
-    
+    window = window[0]  # 假设窗口标题唯一，获取第一个匹配的窗口
+    left, top, width, height = window.left, window.top, window.width, window.height
 
-    # 显示gray_template
-    # cv2.imshow(f"Gray Template for {icon}", gray_template)  # 这里输出gray_template
-    # cv2.waitKey(0)  # 等待用户按键
-    # cv2.destroyAllWindows()  # 关闭显示窗口
+    screenshot = pyautogui.screenshot(region=(left, top, width, height))
+    screenshot = np.array(screenshot)
+    screenshot = cv2.cvtColor(screenshot, cv2.COLOR_BGR2RGB)
+    return screenshot
 
-    # 为每个缩放比例进行模板匹配
-    for scale in np.arange(0.8, 1.1, 0.1):  # 缩放范围从 80% 到 130%
-        resized_template = cv2.resize(gray_template, None, fx=scale, fy=scale)
-        h, w = resized_template.shape
+def show_screenshot(screen):
+    """ 显示截图。 """
+    cv2.imshow("Window Screenshot", screen)
+    cv2.waitKey(0)  # 等待键盘输入来关闭窗口
+    cv2.destroyAllWindows()
 
-        # 模板匹配
-        result = cv2.matchTemplate(gray_screen, resized_template, cv2.TM_CCOEFF_NORMED)
-        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+def match_template_orb(icon, screen, threshold, result_queue):
+    """ 使用 ORB 特征进行多尺度匹配，只匹配模板中的白色部分。 """
+    masked_template, mask = preprocess_image_with_mask(icon)
 
-        if max_val >= threshold:
-            result_queue.put((max_loc, (w, h), template,gray_template))  # 将匹配结果放入队列
-            return
-    result_queue.put(None)  # 如果没有找到匹配结果，放入 None
+    orb = cv2.ORB_create(nfeatures=5000, scaleFactor=1.2, nlevels=8, edgeThreshold=31, patchSize=31)
+    kp_template, des_template = orb.detectAndCompute(masked_template, mask)
 
-def handler():
+    if des_template is None:
+        result_queue.put(None)
+        return
+
+    # 尝试不同的缩放比例
+    scales = np.arange(0.5, 1.1, 0.1).tolist()   # 可以根据实际情况调整这些缩放比例
+    best_match = None
+    best_match_score = float('inf')
+
+    for scale in scales:
+        scaled_template = cv2.resize(masked_template, (0, 0), fx=scale, fy=scale)
+        gray_scaled_template = cv2.cvtColor(scaled_template, cv2.COLOR_BGR2GRAY)
+        kp_scaled, des_scaled = orb.detectAndCompute(gray_scaled_template, None)
+
+        if des_scaled is None:
+            continue
+
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+        matches = bf.match(des_template, des_scaled)
+
+        if matches:
+            matches = sorted(matches, key=lambda x: x.distance)
+            good_matches = [m for m in matches if m.distance < 0.75 * min([match.distance for match in matches])]
+
+            if len(good_matches) > 10:
+                src_pts = np.float32([kp_template[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+                dst_pts = np.float32([kp_scaled[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+
+                matrix, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+                if matrix is not None:
+                    h, w = scaled_template.shape[:2]
+                    corners = np.float32([[0, 0], [w, 0], [w, h], [0, h]]).reshape(-1, 1, 2)
+                    transformed_corners = cv2.perspectiveTransform(corners, matrix)
+
+                    x_min = int(min(transformed_corners[:, 0, 0]))
+                    y_min = int(min(transformed_corners[:, 0, 1]))
+                    x_max = int(max(transformed_corners[:, 0, 0]))
+                    y_max = int(max(transformed_corners[:, 0, 1]))
+
+                    match_score = sum([m.distance for m in good_matches])
+
+                    # 保存最佳匹配
+                    if match_score < best_match_score:
+                        best_match = ((x_min, y_min), (x_max - x_min, y_max - y_min))
+                        best_match_score = match_score
+
+    if best_match is not None:
+        result_queue.put(best_match)
+    else:
+        result_queue.put(None)
+
+def handler(window_title):
+    """ 主处理逻辑：捕获特定窗口截图，执行 ORB 匹配并执行操作。 """
     try:
-        # 截取屏幕截图
-        screen = pyautogui.screenshot()
-        screen = np.array(screen)  # 将 PIL 图像转换为 NumPy 数组
-        screen = cv2.cvtColor(screen, cv2.COLOR_BGR2RGB)  # 转换为 RGB
-
-        # 转换为灰度图以匹配模板
-        gray_screen = cv2.cvtColor(screen, cv2.COLOR_RGB2GRAY)
-        gray_screen = cv2.GaussianBlur(gray_screen, (5, 5), 0)  # 高斯模糊减少噪声
-
-        # 创建一个线程安全的队列来存储结果
+        screen = get_window_screenshot(window_title)
+        # show_screenshot(screen)  # 显示截图
         result_queue = queue.Queue()
         threads = []
-
-        # 为每个图标启动一个线程进行缩放匹配
         for icon in icons:
-            thread = threading.Thread(target=match_template_scaled, args=(icon, gray_screen, threshold, result_queue))
+            thread = threading.Thread(target=match_template_orb, args=(icon, screen, threshold, result_queue))
             threads.append(thread)
             thread.start()
 
-        # 等待所有线程完成
         for thread in threads:
             thread.join()
 
-        # 处理结果
         for icon in icons:
-            result = result_queue.get()  # 从队列中取出匹配结果
+            result = result_queue.get()
             if result:
-                match_position, template_size, template,gray_template = result
+                match_position, template_size = result
                 left, top = match_position
                 width, height = template_size
-
-                if debug:
-                    print(f"找到按钮{icon}位置：{match_position}")
-                    show_match_result(screen, gray_template, (left, top), (width, height))
-                threading.Thread(target=draw_rectangle, args=(left, top, width, height, 0.5)).start()
-
-                # 获取按钮的中心点
                 button_center = (left + width // 2, top + height // 2)
 
-                # 点击按钮
-                pyautogui.click(button_center)
-                print(f"已点击按钮{icon}：{button_center}")
-
-                print("cook.png" in icon)
-
+                threading.Thread(target=draw_rectangle, args=(left, top, width, height, 0.5)).start()
+                # pyautogui.click(button_center)
+                print(f"已点击按钮 {icon}：{button_center}")
                 if "cook.png" in icon:
                     time.sleep(0.5)
                 else:
                     time.sleep(1.2)
                 return True
             else:
-                print(f"未找到按钮{icon}。")
-                
+                print(f"未找到按钮 {icon}。")
     except Exception as e:
         print(f"发生错误：{e}")
 
 def main():
-    # 设置键盘监听器来监听 'Q' 键
+    """ 主函数，监听键盘退出并持续运行处理逻辑。 """
     def exit_program():
         print("检测到 'Q' 键，退出程序")
-        exit()  # 退出程序
+        image_queue.put((None, None))  # 发送退出信号到显示线程
+        exit()
 
-    keyboard.add_hotkey('q', exit_program)  # 绑定 'Q' 键触发退出程序
+    keyboard.add_hotkey('q', exit_program)
+    display_thread = threading.Thread(target=show_images, daemon=True)
+    display_thread.start()
+
+    window_title = "五五的大号"  # 替换为要匹配的窗口的标题
 
     while True:
-        handler()
+        handler(window_title)
         time.sleep(0.2)
         if keyboard.is_pressed('q'):
             print("程序正在退出...")
-            return  # 退出主循环
-
+            image_queue.put((None, None))  # 发送退出信号到显示线程
+            display_thread.join()
+            return
 
 if __name__ == "__main__":
     main()

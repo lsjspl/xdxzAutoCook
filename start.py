@@ -155,12 +155,6 @@ def handler():
         print(f"发生错误：{e}")
 
 def main():
-    # 设置键盘监听器来监听 'Q' 键
-    def exit_program():
-        print("检测到 'Q' 键，退出程序")
-        exit()  # 退出程序
-
-    keyboard.add_hotkey('q', exit_program)  # 绑定 'Q' 键触发退出程序
 
     while True:
         handler()
