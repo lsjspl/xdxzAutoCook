@@ -32,8 +32,14 @@ image_queue = queue.Queue()
 lock = threading.Lock()
 can_click_food = True
 
-# 存储图标缩放比例
-scale_factor = None
+# 存储图标缩放比例，初始化为默认值 1.0
+scale_factors = {
+    "cook_menu": 1.0,
+    "cook": 1.0,
+    "finish": 1.0,
+    "food": 1.0,
+    "cook_start": 1.0,
+}
 
 # 检查是否支持 CUDA
 def check_cuda():
@@ -76,7 +82,7 @@ def preprocess_image_color_only(image_path):
 # 模板匹配
 def match_template(icon, gray_screen, color_screen, threshold, result_queue):
     """ 模板匹配，可能会有多个匹配 """
-    global scale_factor
+    global scale_factors
     try:
         # 根据 icon 类型选择是否使用彩色模板
         if icon in icons_dict["food"] or icon in icons_dict["cook_start"]:
@@ -86,9 +92,8 @@ def match_template(icon, gray_screen, color_screen, threshold, result_queue):
                 result_queue.put(None)
                 return
 
-            # 检测是否已经有缩放比例
-            if scale_factor is None:
-                scale_factor = find_best_scale(template, color_screen)
+            # 使用对应的缩放比例
+            scale_factor = scale_factors.get(icon, 1.0)
 
             # 模板匹配只需要一次缩放
             resized_template = cv2.resize(template, None, fx=scale_factor, fy=scale_factor)
@@ -131,9 +136,8 @@ def match_template(icon, gray_screen, color_screen, threshold, result_queue):
                 result_queue.put(None)
                 return
 
-            # 检测是否已经有缩放比例
-            if scale_factor is None:
-                scale_factor = find_best_scale(masked_template, gray_screen)
+            # 使用对应的缩放比例
+            scale_factor = scale_factors.get(icon, 1.0)
 
             # 模板匹配只需要一次缩放
             resized_template = cv2.resize(masked_template, None, fx=scale_factor, fy=scale_factor)

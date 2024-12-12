@@ -6,45 +6,27 @@ import os
 import time
 import keyboard
 import queue
+from concurrent.futures import ThreadPoolExecutor
 
 # 设置阈值和图像处理相关参数
-debug = False
-threshold = 0.8
+debug = True  # 开启调试模式
+threshold = 0.8  # 降低阈值，使匹配更宽松
 
 # 获取脚本所在的目录
 script_dir = os.path.dirname(os.path.abspath(__file__))
 print(f"脚本目录：{script_dir}")
 
-# 定义图标模板目录
-icons_dict = {
-    "cook_menu": [f"{script_dir}\\cook_menu.png", f"{script_dir}\\cook_menu_1.png"],  # 多个 cook_menu 模板
-    "cook": [f"{script_dir}\\cook.png", f"{script_dir}\\cook_1.png"],  # 多个 cook 模板
-    "finish": [f"{script_dir}\\finish.png", f"{script_dir}\\finish_1.png"],  # 多个 finish 模板
-    "food": [f"{script_dir}\\food.png"],  # 当前只有一个 food 模板
-    "cook_start": [f"{script_dir}\\cook_start.png"],  # 只有一个 cook_start 模板
-}
-
 # 设置 food 为一个全局变量，默认使用 food.png 模板
 food = "food.png"
 
-# 创建显示队列
-image_queue = queue.Queue()
-lock = threading.Lock()
-can_click_food = True
-
-# 存储图标缩放比例
-scale_factor = None
-
-# 检查是否支持 CUDA
-def check_cuda():
-    if cv2.cuda.getCudaEnabledDeviceCount() == 0:
-        print("CUDA 不可用，程序将使用 CPU。")
-        return False
-    else:
-        print("CUDA 可用，程序将使用 GPU 加速。")
-        return True
-
-use_cuda = check_cuda()
+# 定义图标模板目录
+icons_dict = {
+    "cook_menu": [os.path.join(script_dir, "cook_menu.png"), os.path.join(script_dir, "cook_menu_1.png")],
+    "cook": [os.path.join(script_dir, "cook.png"), os.path.join(script_dir, "cook_1.png")],
+    "finish": [os.path.join(script_dir, "finish.png"), os.path.join(script_dir, "finish_1.png")],
+    "food": [os.path.join(script_dir, food)],
+    "cook_start": [os.path.join(script_dir, "cook_start.png")],
+}
 
 # 预处理模板图像（仅适用于灰度图像）
 def preprocess_image_gray_only(image_path):
@@ -56,6 +38,7 @@ def preprocess_image_gray_only(image_path):
 
         _, mask = cv2.threshold(template, 240, 255, cv2.THRESH_BINARY)
         masked_template = cv2.bitwise_and(template, template, mask=mask)
+
         return template, mask, masked_template
     except Exception as e:
         print(f"预处理灰度图像时发生错误：{e}")
@@ -73,122 +56,184 @@ def preprocess_image_color_only(image_path):
         print(f"预处理彩色图像时发生错误：{e}")
         return None
 
+# 计算缩放比例
+def calculate_scale_factor(icon):
+    """
+    计算当前图标与屏幕上实际图标的缩放比例
+    返回: (scale_factor, confidence)
+    """
+    try:
+        # 截取屏幕并转换为灰度图像
+        screen = pyautogui.screenshot()
+        screen = np.array(screen)
+        gray_screen = cv2.cvtColor(screen, cv2.COLOR_RGB2GRAY)
+        color_screen = cv2.cvtColor(screen, cv2.COLOR_RGB2BGR)
+
+        # 根据图标类型选择处理方式
+        if icon in icons_dict["food"] or icon in icons_dict["cook_start"]:
+            template = preprocess_image_color_only(icon)
+            if template is None:
+                return 1.0, 0.0
+            
+            screen_img = color_screen
+        else:
+            template, mask, masked_template = preprocess_image_gray_only(icon)
+            if template is None:
+                return 1.0, 0.0
+            
+            screen_img = gray_screen
+            template = masked_template
+
+        # 多尺度模板匹配
+        scale_factors = np.linspace(0.5, 2.0, 30)  # 从0.5到2.0测试30个不同的缩放比例
+        best_scale = 1.0
+        best_confidence = 0.0
+
+        for scale in scale_factors:
+            # 调整模板大小
+            resized_template = cv2.resize(template, None, fx=scale, fy=scale)
+            
+            # 模板匹配
+            result = cv2.matchTemplate(screen_img, resized_template, cv2.TM_CCOEFF_NORMED)
+            confidence = np.max(result)
+
+            # 更新最佳匹配
+            if confidence > best_confidence:
+                best_confidence = confidence
+                best_scale = scale
+
+        print(f"图标 {os.path.basename(icon)} - 最佳缩放比例: {best_scale:.2f}, 置信度: {best_confidence:.2f}")
+
+        # 如信度太低，返回默认值
+        if best_confidence < threshold:
+            print(f"警告: 图标 {os.path.basename(icon)} 匹配置信度过低")
+            return 1.0, 0.0
+
+        return best_scale, best_confidence
+
+    except Exception as e:
+        print(f"计算缩放比例时发生错误：{e}")
+        return 1.0, 0.0
+
+def get_optimal_scale_factor():
+    """
+    获取所有模板的最优缩放比例
+    """
+    scale_results = []
+    
+    # 测试所有模板
+    for category, icons in icons_dict.items():
+        for icon in icons:
+            scale, confidence = calculate_scale_factor(icon)
+            if confidence > threshold:
+                scale_results.append((scale, confidence))
+    
+    if not scale_results:
+        print("警告: 未能找到有效的缩放比例，使用默认值 1.0")
+        return 1.0
+    
+    # 使用置信度作为权重计算加权平均缩放比例
+    total_weight = sum(conf for _, conf in scale_results)
+    weighted_scale = sum(scale * conf for scale, conf in scale_results) / total_weight
+    
+    print(f"最终计算的加权平均缩放比例: {weighted_scale:.2f}")
+    return weighted_scale
+
 # 模板匹配
-def match_template(icon, gray_screen, color_screen, threshold, result_queue):
-    """ 模板匹配，可能会有多个匹配 """
-    global scale_factor
+def match_template(icon, gray_screen, color_screen, threshold, result_queue, scale_factor):
     try:
         # 根据 icon 类型选择是否使用彩色模板
         if icon in icons_dict["food"] or icon in icons_dict["cook_start"]:
-            # 彩色模板匹配
             template = preprocess_image_color_only(icon)
             if template is None:
+                print(f"无法加载模板图像: {icon}")
                 result_queue.put(None)
                 return
 
-            # 检测是否已经有缩放比例
-            if scale_factor is None:
-                scale_factor = find_best_scale(template, color_screen)
-
-            # 模板匹配只需要一次缩放
             resized_template = cv2.resize(template, None, fx=scale_factor, fy=scale_factor)
             result = cv2.matchTemplate(color_screen, resized_template, cv2.TM_CCOEFF_NORMED)
-
-            # 获取匹配的所有位置
-            locations = np.where(result >= threshold)
-            rectangles = []
-            for pt in zip(*locations[::-1]):
-                rectangles.append([pt[0], pt[1], resized_template.shape[1], resized_template.shape[0]])
-
-            # 如果没有找到匹配项，则退出
-            if not rectangles:
-                print(f"{icon} 没有匹配项")
-                result_queue.put(None)
-                return
-
-            # 使用非极大值抑制去除重叠的框
-            indices = cv2.dnn.NMSBoxes(rectangles, [threshold] * len(rectangles), score_threshold=threshold, nms_threshold=0.4)
-
-            if indices is None or len(indices) == 0:
-                print(f"没有找到有效的框索引：{icon}")
-                result_queue.put(None)
-                return
-
-            # 确保我们正确处理返回的结果
-            if isinstance(indices, tuple):
-                indices = indices[0]  # 取出元组中的第一个元素，这就是框的索引
-
-            # 检查是否有索引，并用 `.flatten()` 来获取索引
-            if indices is not None and len(indices) > 0:
-                for i in indices.flatten():
-                    box = rectangles[i]
-                    result_queue.put((icon, (box[0], box[1]), (box[2], box[3])))
-
+            screen_img = color_screen
         else:
-            # 灰度模板匹配
             template, mask, masked_template = preprocess_image_gray_only(icon)
             if template is None:
+                print(f"无法加载模板图像: {icon}")
                 result_queue.put(None)
                 return
 
-            # 检测是否已经有缩放比例
-            if scale_factor is None:
-                scale_factor = find_best_scale(masked_template, gray_screen)
-
-            # 模板匹配只需要一次缩放
             resized_template = cv2.resize(masked_template, None, fx=scale_factor, fy=scale_factor)
             result = cv2.matchTemplate(gray_screen, resized_template, cv2.TM_CCOEFF_NORMED)
+            screen_img = gray_screen
 
-            # 获取匹配的所有位置
-            locations = np.where(result >= threshold)
-            rectangles = []
-            for pt in zip(*locations[::-1]):
-                rectangles.append([pt[0], pt[1], resized_template.shape[1], resized_template.shape[0]])
+        # 获取匹配结果
+        locations = np.where(result >= threshold)
+        rectangles = []
+        for pt in zip(*locations[::-1]):
+            rectangles.append([int(pt[0]), int(pt[1]), 
+                             int(resized_template.shape[1]), 
+                             int(resized_template.shape[0])])
 
-            # 如果没有找到匹配项，则退出
-            if not rectangles:
-                print(f"{icon} 没有匹配项")
-                result_queue.put(None)
-                return
+        if debug:
+            print(f"图标 {os.path.basename(icon)} 检测到 {len(rectangles)} 个匹配位置")
+            if len(rectangles) > 0:
+                print(f"最高匹配度: {np.max(result):.3f}")
 
-            # 使用非极大值抑制去除重叠的框
-            indices = cv2.dnn.NMSBoxes(rectangles, [threshold] * len(rectangles), score_threshold=threshold, nms_threshold=0.4)
+        # 应用非最大值抑制
+        if len(rectangles) > 0:
+            rectangles = np.array(rectangles)
+            weights = np.ones((len(rectangles), 1))
+            rectangles = np.hstack((rectangles, weights))
+            pick = non_max_suppression(rectangles, 0.3)
+            
+            if debug:
+                print(f"非最大值抑制后剩余 {len(pick)} 个匹配位置")
 
-            if indices is None or len(indices) == 0:
-                print(f"没有找到有效的框索引：{icon}")
-                result_queue.put(None)
-                return
-
-            # 确保我们正确处理返回的结果
-            if isinstance(indices, tuple):
-                indices = indices[0]  # 取出元组中的第一个元素，这就是框的索引
-
-            # 检查是否有索引，并用 `.flatten()` 来获取索引
-            if indices is not None and len(indices) > 0:
-                for i in indices.flatten():
-                    box = rectangles[i]
-                    result_queue.put((icon, (box[0], box[1]), (box[2], box[3])))
+            # 返回过滤后的结果
+            for (x, y, w, h, _) in pick:
+                result_queue.put((icon, (int(x), int(y)), (int(w), int(h))))
 
     except Exception as e:
         print(f"模板匹配时发生错误：{e}")
         result_queue.put(None)
 
-# 尝试不同的缩放比例，返回最合适的比例
-def find_best_scale(template, screen):
-    max_similarity = 0
-    best_scale = 1.0
-    scales = [0.8, 0.9, 1.0, 1.1, 1.2]  # 尝试不同的缩放比例
+def non_max_suppression(boxes, overlapThresh):
+    """非最大值抑制函数"""
+    if len(boxes) == 0:
+        return []
 
-    for scale in scales:
-        resized_template = cv2.resize(template, None, fx=scale, fy=scale)
-        result = cv2.matchTemplate(screen, resized_template, cv2.TM_CCOEFF_NORMED)
-        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-        if max_val > max_similarity:
-            max_similarity = max_val
-            best_scale = scale
+    # 初始化选择的索引列表
+    pick = []
 
-    print(f"最佳缩放比例: {best_scale}，相似度: {max_similarity}")
-    return best_scale
+    # 获取坐标
+    x1 = boxes[:, 0]
+    y1 = boxes[:, 1]
+    x2 = x1 + boxes[:, 2]
+    y2 = y1 + boxes[:, 3]
+
+    # 计算面积
+    area = (x2 - x1 + 1) * (y2 - y1 + 1)
+    idxs = np.argsort(y2)
+
+    while len(idxs) > 0:
+        last = len(idxs) - 1
+        i = idxs[last]
+        pick.append(i)
+
+        # 找到相交区域
+        xx1 = np.maximum(x1[i], x1[idxs[:last]])
+        yy1 = np.maximum(y1[i], y1[idxs[:last]])
+        xx2 = np.minimum(x2[i], x2[idxs[:last]])
+        yy2 = np.minimum(y2[i], y2[idxs[:last]])
+
+        # 计算重叠区域
+        w = np.maximum(0, xx2 - xx1 + 1)
+        h = np.maximum(0, yy2 - yy1 + 1)
+        overlap = (w * h) / area[idxs[:last]]
+
+        # 删除重叠过大的框
+        idxs = np.delete(idxs, np.concatenate(([last],
+            np.where(overlap > overlapThresh)[0])))
+
+    return boxes[pick]
 
 # 点击按钮
 def click_button(icon, result):
@@ -201,83 +246,143 @@ def click_button(icon, result):
     time.sleep(1)
 
 # 处理窗口截图，检测按钮并按顺序点击
-def handle_window():
-    screen = pyautogui.screenshot()
-    screen = np.array(screen)
-    gray_screen = cv2.cvtColor(screen, cv2.COLOR_RGB2GRAY)
-    gray_screen = cv2.GaussianBlur(gray_screen, (5, 5), 0)
+def handle_window(scale_factor, executor=None):
+    try:
+        screen = pyautogui.screenshot()
+        screen = np.array(screen)
+        gray_screen = cv2.cvtColor(screen, cv2.COLOR_RGB2GRAY)
+        gray_screen = cv2.GaussianBlur(gray_screen, (5, 5), 0)
+        color_screen = cv2.cvtColor(screen, cv2.COLOR_RGB2BGR)
 
-    # 使用原始彩色屏幕用于彩色模板匹配
-    color_screen = cv2.cvtColor(screen, cv2.COLOR_RGB2BGR)
+        if debug:
+            print("\n开始新一轮按钮检测...")
+            print(f"屏幕尺寸: {screen.shape}")
+            print(f"当前缩放比例: {scale_factor}")
 
-    result_queue = queue.Queue()
-    threads = []
+        result_queue = queue.Queue()
+        futures = []
 
-    # 为每个图标启动线程进行模板匹配
-    for category, icons in icons_dict.items():
-        for icon in icons:
-            print(f"正在匹配图标: {icon}")
-            thread = threading.Thread(target=match_template, args=(icon, gray_screen, color_screen, threshold, result_queue))
-            threads.append(thread)
-            thread.start()
+        for category, icons in icons_dict.items():
+            for icon in icons:
+                if executor:
+                    futures.append(
+                        executor.submit(match_template, icon, gray_screen, color_screen, threshold, result_queue, scale_factor)
+                    )
+                else:
+                    match_template(icon, gray_screen, color_screen, threshold, result_queue, scale_factor)
 
-    # 等待所有线程完成
-    for thread in threads:
-        thread.join()
+        if executor:
+            for future in futures:
+                future.result()
 
-    # 从队列中获取所有匹配结果
-    results = {}
-    while not result_queue.empty():
-        result = result_queue.get()
-        if result:
-            matched_icon, match_position, template_size = result
-            if matched_icon not in results:
-                results[matched_icon] = []
-            results[matched_icon].append((match_position, template_size))
+        results = {}
+        while not result_queue.empty():
+            result = result_queue.get()
+            if result:
+                matched_icon, match_position, template_size = result
+                base_name = os.path.basename(matched_icon)
+                base_name = base_name.split('_')[0] + '.png'
+                if base_name not in results:
+                    results[base_name] = []
+                results[base_name].append((match_position, template_size))
 
-    return results
+        if debug:
+            print(f"检测结果: {', '.join([f'{k}: {len(v)}个' for k, v in results.items()])}")
+
+        return results
+
+    except Exception as e:
+        print(f"处理窗口截图时发生错误：{e}")
+        return {}
+
+def wait_for_button(executor, scale_factor, button_name, count=1, timeout=30):
+    """通用的按钮等待函数"""
+    start_time = time.time()
+    while True:
+        if time.time() - start_time > timeout:
+            return None
+        
+        results = handle_window(scale_factor, executor)
+        if button_name in results and len(results[button_name]) >= count:
+            return results[button_name]
+        
+        time.sleep(0.5)
 
 # 主函数
 def main():
-    global can_click_food, food
+    # 计算最优缩放比例
+    scale_factor = get_optimal_scale_factor()
+    print(f"使用的缩放比例: {scale_factor}")
 
     try:
-        while True:
-            results = handle_window()
+        with ThreadPoolExecutor() as executor:
+            while True:
+                try:
+                    # 检测初始状态
+                    results = handle_window(scale_factor, executor)
+                    
+                    # 输出检测到的 cook_menu 按钮数量
+                    cook_menu_count = len(results.get("cook_menu.png", []))
+                    print(f"当前检测到 {cook_menu_count} 个 cook_menu 按钮")
+                    
+                    # 检查是否有3个cook_menu按钮
+                    if "cook_menu.png" in results and len(results["cook_menu.png"]) == 3:
+                        print("检测到3个cook_menu按钮��开始处理...")
+                        # 等待3个cook_menu按钮
+                        cook_menu_buttons = wait_for_button(executor, scale_factor, "cook_menu.png", count=3, timeout=30)
+                        if not cook_menu_buttons:
+                            print("检测到足够的cook_menu按钮")
+                            continue
 
-            if "cook_menu.png" in results and len(results["cook_menu.png"]) == 3:
-                for cook_menu_button in results["cook_menu.png"]:
-                    click_button("cook_menu.png", cook_menu_button)
-                    results = handle_window()
+                        # 处理每个cook_menu按钮
+                        for i in range(3):
+                            # 重新检测cook_menu位置
+                            cook_menu_buttons = wait_for_button(executor, scale_factor, "cook_menu.png", count=3-i)
+                            if not cook_menu_buttons:
+                                continue
+
+                            click_button("cook_menu.png", cook_menu_buttons[0])
+                            
+                            # 等待food按钮
+                            food_button = wait_for_button(executor, scale_factor, os.path.basename(food))
+                            if food_button:
+                                click_button(os.path.basename(food), food_button[0])
+                                
+                                # 等待cook_start按钮
+                                cook_start_button = wait_for_button(executor, scale_factor, "cook_start.png")
+                                if cook_start_button:
+                                    click_button("cook_start.png", cook_start_button[0])
+
+                        # 等待并处理finish按钮
+                        while True:
+                            cook_button = wait_for_button(executor, scale_factor, "cook.png")
+                            if cook_button:
+                                click_button("cook.png", cook_button[0])
+
+                            finish_buttons = wait_for_button(executor, scale_factor, "finish.png", count=3, timeout=5)
+                            if finish_buttons:
+                                for finish_button in finish_buttons[:3]:
+                                    click_button("finish.png", finish_button)
+                                break
+
+                            time.sleep(0.5)
+
+                    time.sleep(1)  # 添加延时避免输出太快
+
+                    if keyboard.is_pressed('q'):
+                        print("程序正在退出...")
+                        break
+
+                except Exception as e:
+                    print(f"循环中发生错误：{e}")
                     time.sleep(1)
-
-                    if food in results:
-                        click_button(food, results[food])
-                        can_click_food = True
-                        results = handle_window()
-
-                    if "cook_start.png" in results and can_click_food:
-                        click_button("cook_start.png", results["cook_start.png"])
-
-            while "finish.png" in results and len(results["finish.png"]) < 3:
-                if "cook.png" in results:
-                    click_button("cook.png", results["cook.png"][0])
-                    results = handle_window()
-                    time.sleep(1)
-
-            if "finish.png" in results:
-                for finish_button in results["finish.png"][:3]:
-                    click_button("finish.png", finish_button)
-                    results = handle_window()
-                    time.sleep(1)
-
-            if keyboard.is_pressed('q'):
-                print("程序正在退出...")
-                break
+                    continue
 
     except Exception as e:
-        print(f"程序发生错误：{e}")
+        print(f"程序出现错误：{e}")
+    finally:
+        cv2.destroyAllWindows()
 
-# 程序入口
+# 执行主程序
 if __name__ == "__main__":
     main()
