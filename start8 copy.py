@@ -11,6 +11,7 @@ from enum import Enum, auto
 import keyboard
 from datetime import datetime, timedelta
 import sys
+import argparse
 
 # 配置日志
 logging.basicConfig(
@@ -37,7 +38,7 @@ class OverlayWindow:
         """初始化覆盖窗口"""
         self.root = tk.Tk()
         self.root.title("Overlay")
-        self.root.attributes('-alpha', 0.3, '-topmost', True)
+        self.root.attributes('-alpha', 1.0, '-topmost', True)
         self.root.attributes('-fullscreen', True)
         self.root.configure(bg='black')
         self.root.attributes('-transparentcolor', 'black')
@@ -59,7 +60,7 @@ class OverlayWindow:
             self.canvas.create_rectangle(
                 x, y, x + w, y + h,
                 outline='green',
-                width=8
+                width=5
                 
             )
             # 显示置信度
@@ -67,25 +68,28 @@ class OverlayWindow:
                 x, y - 10,
                 text=f'{conf:.2f}',
                 fill='green',
-                anchor='sw'
+                anchor='sw',
+                font=('Arial', 12, 'bold')  # 加粗字体
             )
         
         self.root.update()
 
 class CookingBot:
-    def __init__(self, food_name="food"):
+    def __init__(self, food_name="food", loop_count=1):
         """
         初始化烹饪机器人
         :param food_name: 食物模板的名称（不包含.png后缀）
+        :param loop_count: 循环执行次数，-1表示无限循环
         """
         self.state = CookingState.DETECT_MENU
         self.menu_clicks = 0
-        self.cook_clicks = 0
         self.finish_clicks = 0
         self.food_clicked = False
         self.executor = ThreadPoolExecutor(max_workers=4)
         self.running = True
         self.food_name = food_name
+        self.loop_count = loop_count
+        self.current_loop = 0
         
         # 获取脚本目录
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -106,7 +110,7 @@ class CookingBot:
                 'finish_1.png'
             ],
             'cook_start': ['cook_start.png'],  # 单模板
-            'food': [f'{food_name}.png']  # 动态食物模板
+            'food': [f'{food_name}.png',f'{food_name}_1.png']  # 动态食物模板
         }
         
         # 分别存储普通模板和食物模板
@@ -122,42 +126,26 @@ class CookingBot:
         # 添加视角旋转相关配置
         self.screen_width = pyautogui.size().width
         self.screen_height = pyautogui.size().height
-        self.rotation_duration = 0.1  # 旋转持续时间（秒）
-        self.rotation_distance = 500  # 每次旋转的水平距离（像素）
-        self.max_rotations = 4  # 最大旋转数
-        self.current_rotations = 0  # 当前旋转次数
-        
-        # 定义视角旋转的起始点（屏幕右侧中间）
-        self.rotation_start_x = int(self.screen_width * 0.8)  # 屏幕80%位置
-        self.rotation_start_y = int(self.screen_height * 0.5)  # 屏幕中间
         
         # 添加状态计时相关属性
         self.state_start_time = datetime.now()
         self.timeout = 30  # 每个状态的超时时间（秒）
         self.max_retries = 3  # 最大重试次数
-        self.retry_delay = 0.5  # 重试间隔（秒）
         self.retry_count = 0
         
         # 添加食物和开始按钮位置缓存
         self.food_button_pos = None
         self.start_button_pos = None
         
-        # 优化截图和检测频率
+        # 优化模板匹配参数
+        self.scale_factors = np.arange(0.8, 1.2, 0.1)
+        
+        # 优化截图缓存
         self.last_screenshot = None
-        self.screenshot_interval = 0.1  # 截图间隔时间
         self.last_screenshot_time = 0
         
-        # 优化模板匹配参数
-        self.scale_factors = np.arange(0.8, 1.2, 0.1)  # 减少缩放范围
-        self.nms_threshold = 0.4
-        self.match_threshold = 0.7
-        
-        # 优化参数
-        self.detection_interval = 0.2
-        self.last_detection = None
-        self.last_detection_time = 0
-        self.roi_enabled = True
-    
+        self.start_clicks = 0  # 添加开始按钮点击计数器
+
     def load_food_templates(self):
         """加载食物彩色模板"""
         food_templates = []
@@ -202,7 +190,7 @@ class CookingBot:
             
             all_matches = []
             scale_factors = self.scale_factors
-            threshold = 0.75
+            threshold = 0.8
             
             for template in self.food_templates:
                 template_matches = []
@@ -272,7 +260,7 @@ class CookingBot:
                     logger.info(f"[food] 检测到 {len(best_matches)} 个食物按钮，"
                               f"选择左上角按钮，位置: ({selected_match[0]}, {selected_match[1]})")
                     
-                    # 只显示和返回左上角的按钮
+                    # 显示和返回左上角的按钮
                     self.overlay.update_overlay([selected_match])
                     return [selected_match]
             
@@ -288,21 +276,21 @@ class CookingBot:
         """获取屏幕截图，带缓存"""
         current_time = time.time()
         if (self.last_screenshot is None or 
-            current_time - self.last_screenshot_time >= self.screenshot_interval):
+            current_time - self.last_screenshot_time >= 0.1):  # 直接使用固定值0.1
             self.last_screenshot = np.array(pyautogui.screenshot())
             self.last_screenshot_time = current_time
         return self.last_screenshot
     
-    def detect_buttons(self, template_name, threshold=0.6):
+    def detect_buttons(self, template_name, threshold=0.8):
         """优化的按钮检测"""
         try:
             if template_name == 'cook':
                 # cook按钮使用更快的检测参数
-                self.scale_factors = np.arange(0.9, 1.1, 0.1)  # 减少缩放范围
-                threshold = 0.5  # 降低阈值
+                self.scale_factors = np.arange(0.9, 1.1, 0.1)
+                threshold = 0.5
             else:
-                # 其他按钮使用正常参数
                 self.scale_factors = np.arange(0.8, 1.2, 0.1)
+                threshold = 0.6
             
             if template_name == 'food':
                 return self.detect_food()
@@ -362,19 +350,19 @@ class CookingBot:
                 if template_matches:
                     all_matches.extend(template_matches)
             
-            # 对所有匹配结果进行NMS
+            # 对所有匹配结果进行NMS，使用固定阈值0.4
             if all_matches:
                 rectangles = np.array(all_matches)
                 indices = cv2.dnn.NMSBoxes(
                     rectangles[:, :4].tolist(),
                     rectangles[:, 4].tolist(),
                     threshold,
-                    0.4
+                    0.4  # 直接使用固定值
                 )
                 
                 if len(indices) > 0:
                     best_matches = rectangles[indices.flatten()]
-                    logger.debug(f"[{template_name}] 检测到 {len(best_matches)} 个按钮，"
+                    logger.debug(f"[{template_name}] 检测到 {len(best_matches)} 个按钮"
                                f"置信度: {[f'{match[4]:.2f}' for match in best_matches]}")
                     self.overlay.update_overlay(best_matches)
                     return best_matches.tolist()
@@ -429,7 +417,7 @@ class CookingBot:
     def set_food(self, food_name):
         """更改要制作的食物"""
         self.food_name = food_name
-        self.template_config['food'] = [f'{food_name}.png']
+        self.template_config['food'] = [f'{food_name}.png',f'{food_name}_1.png']
         self.templates = self.load_templates()  # 重新加载有模板
         logger.info(f"已更改食物为: {food_name}")
 
@@ -444,7 +432,7 @@ class CookingBot:
         self.running = False
 
     def preprocess_image(self, image):
-        """改进的图像预处理方法，处理复杂背景"""
+        """改进的图像预处理方法，处理复杂景"""
         try:
             # 转换到HSV颜色空间
             hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -530,8 +518,10 @@ class CookingBot:
         return False
 
     def rotate_view(self):
-        """优化的视角旋转,加快cook检测"""
+        """优化的视角旋转和按钮检测"""
         try:
+            logger.info(f"开始旋转视角检测，当前菜单点击次数: {self.menu_clicks}")
+            
             # 旋转前检测cook按钮
             if self.check_and_click_cook():
                 return True
@@ -542,41 +532,84 @@ class CookingBot:
             center_y = screen_height // 2
             
             # 计算偏右上的位置
-            rotate_x = center_x + 100
-            rotate_y = center_y - 50
+            rotate_x = center_x + 200
+            rotate_y = center_y - 200
+
+            rotation_distance = 800  # 每次旋转的水平距离（像素）
+
+            # 分段旋转,每段都检测按钮
+            segment_distance = rotation_distance // 4
+            mouse_is_down = False  # 跟踪鼠标状态
             
-            # 快速旋转
-            pyautogui.moveTo(rotate_x, rotate_y)
-            pyautogui.mouseDown(button='left')
-            
-            # 分2段旋转,每段都检测cook
-            segment_distance = self.rotation_distance // 2
-            for i in range(2):
-                pyautogui.moveRel(segment_distance, 0, duration=0.1)  # 加快旋转速度
-                pyautogui.mouseUp(button='left')
-                
-                # 立即检测cook按钮
-                if self.check_and_click_cook():
-                    return True
-                
-                # 根据当前状态检测相应按钮
-                if self.state == CookingState.DETECT_MENU:
-                    menu_buttons = self.detect_buttons('cook_menu')
-                    if menu_buttons and len(menu_buttons) >= 3:
-                        return True
-                elif self.state == CookingState.CLICK_FINISH:
-                    finish_buttons = self.detect_buttons('finish')
-                    if finish_buttons and len(finish_buttons) > 0:
-                        return True
-                
-                if i < 1:  # 继续下一段旋转
+            for i in range(4):
+                try:
+                    logger.info(f"第 {i+1}/4 段旋转")
+                    # 移动到起始位置
+                    pyautogui.moveTo(rotate_x, rotate_y)
                     pyautogui.mouseDown(button='left')
+                    mouse_is_down = True
+                    
+                    # 缓慢旋转一段距离
+                    pyautogui.moveRel(segment_distance, 0, duration=0.1)
+                    pyautogui.mouseUp(button='left')
+                    mouse_is_down = False
+                    
+                    # 等待画面完全稳定
+                    time.sleep(0.3)
+                    
+                    # 检测按钮
+                    if self.state == CookingState.DETECT_MENU:
+                        # 多次尝试检测菜单按钮
+                        for attempt in range(2):
+                            menu_buttons = self.detect_buttons('cook_menu')
+                            logger.info(f"旋转检测第 {attempt+1} 次: 检测到 {len(menu_buttons)} 个按钮")
+                            if menu_buttons:
+                                if self.menu_clicks == 0:
+                                    # 第一次必须检测到3个按钮
+                                    if len(menu_buttons) >= 3:
+                                        logger.info(f"=== 首次检测到 {len(menu_buttons)} 个菜单按钮，停止旋转 ===")
+                                        return True
+                                    else:
+                                        logger.info("首次检测未满3个按钮，继续旋转")
+                                        continue
+                                else:
+                                    # 后续只要检测到按钮就停止旋转
+                                    logger.info(f"=== 检测到 {len(menu_buttons)} 个菜单按钮，已点击 {self.menu_clicks} 次，停止旋转 ===")
+                                    return True
+                            time.sleep(0.3)
+                            
+                    elif self.state == CookingState.DETECT_FINISH:
+                        finish_buttons = self.detect_buttons('finish')
+                        if finish_buttons and len(finish_buttons) > 0:
+                            return True
+                    
+                    # 检测cook按钮
+                    if self.check_and_click_cook():
+                        return True
+                    
+                    # 继续下一段旋转前的等待
+                    if i < 3:
+                        time.sleep(0.3)
+                        
+                except Exception as e:
+                    logger.error(f"旋转过程中出错: {e}")
+                    if mouse_is_down:
+                        pyautogui.mouseUp(button='left')
+                        mouse_is_down = False
+                    raise
             
             return True
-            
+                
         except Exception as e:
             logger.error(f"旋转视角失败: {e}")
             return False
+            
+        finally:
+            # 确保在任何情况下都释放鼠标
+            try:
+                pyautogui.mouseUp(button='left')
+            except:
+                pass
     
     def reset_rotation(self):
         """重置旋转计数"""
@@ -606,30 +639,39 @@ class CookingBot:
     
     def handle_timeout(self):
         """处理超时情况"""
-        if self.retry_count >= self.max_retries:
-            logger.error(f"状态 {self.state} 超过最大重试次数")
-            return False
-        
-        self.retry_count += 1
-        logger.warning(f"状态 {self.state} 超时，第 {self.retry_count} 次重试")
-        time.sleep(self.retry_delay)
+        if (datetime.now() - self.state_start_time).seconds >= self.timeout:
+            if self.retry_count < self.max_retries:
+                self.retry_count += 1
+                logger.warning(f"状态 {self.state} 超时，第 {self.retry_count} 次重试")
+                time.sleep(0.5)  # 直接使用固定值
+                return True
+            else:
+                logger.error(f"状态 {self.state} 超过最大重试次数")
+                return False
         return True
     
     def change_state(self, new_state):
         """切换状态"""
-        logger.info(f"状态切换: {self.state} -> {new_state}")
+        logger.info(f"状态切换: {self.state} -> {new_state}, 当前菜单点击次数: {self.menu_clicks}")
         self.state = new_state
         self.reset_state_timer()
     
     def handle_menu_state(self):
         """处理菜单检测状态"""
         menu_buttons = self.detect_buttons('cook_menu')
-        if len(menu_buttons) == 3:
+        logger.info(f"当前状态: DETECT_MENU, 菜单点击次数: {self.menu_clicks}, 检测到按钮数: {len(menu_buttons)}")
+        
+        if len(menu_buttons) == 3 and self.menu_clicks == 0:
             logger.info("=== 检测到3个菜单按钮，开始点击流程 ===")
             self.reset_rotation()
             self.change_state(CookingState.CLICK_MENU)
             return
-        
+        elif len(menu_buttons) > 0 and self.menu_clicks > 0:
+            logger.info(f"=== 检测到 {len(menu_buttons)} 个菜单按钮，已点击 {self.menu_clicks} 次，继续点击流程 ===")
+            self.reset_rotation()
+            self.change_state(CookingState.CLICK_MENU)
+            return
+            
         logger.debug(f"等待菜单按钮，当前检测到 {len(menu_buttons)} 个")
         # 检查遗留的完成按钮
         finish_buttons = self.detect_buttons('finish')
@@ -642,15 +684,20 @@ class CookingBot:
             except Exception as e:
                 logger.error(f"点击完成按钮失败: {e}")
         
-        # 尝试旋转视角寻找菜单按钮
-        if not self.rotate_view():
+        # 尝试旋转视角找菜单按钮
+        if self.rotate_view():
+            # 旋转找到按钮后，直接进入点击状态
+            self.reset_rotation()
+            self.change_state(CookingState.CLICK_MENU)
+            return
+        else:
             logger.warning("已旋转一圈仍未找到足够的菜单按钮")
             self.reset_rotation()
             if not self.handle_timeout():
                 raise Exception("菜单检测超时")
 
     def handle_food_state(self):
-        """处理食物检测状态 - 使用保存的食物按钮位置"""
+        """处理食物检测状态 - 用保存的食物按钮位置"""
         try:
             # 确保有保存的食物按钮位置
             if not self.food_button_pos:
@@ -667,7 +714,7 @@ class CookingBot:
                 pyautogui.click(center_x, center_y)
                 pyautogui.click(center_x, center_y)  # 双击确保选中
                 logger.info(f"点击食物按钮位置: ({center_x}, {center_y})")
-                time.sleep(0.5)
+                time.sleep(0.3)
                 
                 # 首次检测并保存开始按钮位置
                 if not self.start_button_pos:
@@ -695,36 +742,53 @@ class CookingBot:
 
     def handle_start_state(self):
         """处理开始按钮状态"""
-        if not self.food_clicked or self.start_button_pos is None:
-            logger.warning("食物未点击或开始按钮位置未知，返回食物检测状态")
-            self.change_state(CookingState.DETECT_FOOD)
-            return
-        
-        logger.info("=== 点击开始按钮 ===")
         try:
-            if self.click_button_with_verify(self.start_button_pos, 'cook_start', expected_count=0, wait_time=0.5):
-                if self.menu_clicks >= 3:
-                    logger.info("=== 菜单点击完成，等待cook按钮 ===")
-                    self.change_state(CookingState.DETECT_COOK)
-                else:
-                    logger.info(f"=== 当前菜单点击次数: {self.menu_clicks}，继续点击菜单 ===")
-                    # 在切换到CLICK_MENU之前，先检查是否能检测到菜单按钮
-                    menu_buttons = self.detect_buttons('cook_menu')
-                    if menu_buttons and len(menu_buttons) > 0:
-                        self.change_state(CookingState.CLICK_MENU)
+            # 使用保存的开始按钮位置
+            if not self.start_button_pos:
+                logger.warning("未保存开始按钮位置，返回菜单检测状态")
+                self.change_state(CookingState.DETECT_MENU)
+                return
+            
+            logger.info("=== 使用保存的开始按钮位置点击 ===")
+            try:
+                x, y, w, h, _ = self.start_button_pos
+                center_x = int(x + w // 2)
+                center_y = int(y + h // 2)
+                
+                pyautogui.click(center_x, center_y)
+                pyautogui.click(center_x, center_y)
+                logger.info(f"点击开始按钮位置: ({center_x}, {center_y})")
+                time.sleep(0.5)
+                
+                # 验证点击是否成功
+                start_buttons = self.detect_buttons('cook_start', threshold=0.5)
+                if not start_buttons or len(start_buttons) == 0:
+                    logger.info("开始按钮点击成功（按钮消失）")
+                    # 增加开始按钮点击计数
+                    self.start_clicks += 1
+                    logger.info(f"当前开始按钮点击次数: {self.start_clicks}")
+                    
+                    # 检查开始按钮点击次数
+                    if self.start_clicks >= 3:
+                        logger.info("=== 已完成3次开始按钮点击，进入完成状态 ===")
+                        self.change_state(CookingState.DETECT_FINISH)  # 切换到 DETECT_FINISH
                     else:
-                        logger.info("未检测到菜单按钮，先切换到菜单检测状态")
+                        logger.info(f"=== 开始按钮点击未完成（{self.start_clicks}/3），继续点击菜单 ===")
                         self.change_state(CookingState.DETECT_MENU)
-            else:
-                logger.warning("开始按钮点击未生效，重试")
-                self.reset_button_positions()
-                self.change_state(CookingState.DETECT_FOOD)
+                else:
+                    logger.warning("开始按钮点击可能未生效，重试")
+                    if not self.handle_timeout():
+                        raise Exception("开始按钮点击超时")
+                    
+            except Exception as e:
+                logger.error(f"点击开始按钮失败: {e}")
+                if not self.handle_timeout():
+                    raise Exception("开始按钮点击超时")
                 
         except Exception as e:
-            logger.error(f"点击开始按钮失败: {e}")
-            self.reset_button_positions()
+            logger.error(f"处理开始状态时出错: {e}")
             if not self.handle_timeout():
-                raise Exception("开始按钮点击超时")
+                raise Exception("开始状态处理超时")
 
     def handle_cook_state(self):
         """处理烹饪状态"""
@@ -732,7 +796,7 @@ class CookingBot:
         if len(cook_buttons) > 0:
             logger.info(f"=== 点击烹饪按钮 ===")
             try:
-                if self.click_button_with_verify(cook_buttons[0], 'finish', expected_count=3, wait_time=0.5):
+                if self.click_button_with_verify(cook_buttons[0], 'finish', expected_count=3, wait_time=0.8):
                     self.cook_clicks += 1
                     self.reset_rotation()
                     self.change_state(CookingState.CLICK_FINISH)
@@ -750,11 +814,9 @@ class CookingBot:
                     raise Exception("烹饪按钮检测超时")
 
     def handle_finish_state(self):
-        """处理完成状态 - 检测到finish按钮就点击，并验证点击结果"""
+        """处理完成状态 - 检测到3个finish按钮才开始点击"""
         try:
             finish_buttons = self.detect_buttons('finish')
-            
-            # 记录检测到的finish按钮数量
             logger.info(f"检测到 {len(finish_buttons)} 个finish按钮")
             
             # 处理遗留的finish按钮（在菜单点击未满3次时）
@@ -779,10 +841,10 @@ class CookingBot:
                 except Exception as e:
                     logger.error(f"点击遗留finish按钮失败: {e}")
                     
-            # 正常的finish处理（完成3次菜单点击后）
-            if self.menu_clicks >= 3:
-                if finish_buttons and len(finish_buttons) > 0:
-                    logger.info(f"=== 检测到 {len(finish_buttons)} 个finish按钮，继续点击 ===")
+            # 正常的finish处理（完成3次start点击后）
+            if self.start_clicks >= 3:
+                if finish_buttons and len(finish_buttons) >= 3:  # 必须检测到3个finish按钮
+                    logger.info(f"=== 检测到 {len(finish_buttons)} 个finish按钮，开始点击 ===")
                     try:
                         # 点击检测到的每个finish按钮
                         for finish_button in finish_buttons:
@@ -797,51 +859,46 @@ class CookingBot:
                             time.sleep(0.5)  # 点击后短暂等待
                             
                             # 验证点击结果
-                            max_verify_attempts = 3
-                            for attempt in range(max_verify_attempts):
-                                verify_buttons = self.detect_buttons('finish')
-                                if not verify_buttons or len(verify_buttons) < len(finish_buttons):
-                                    logger.info("finish按钮点击成功（按钮消失）")
-                                    self.finish_clicks += 1
-                                    logger.info(f"当前finish点击次数: {self.finish_clicks}")
-                                    break
-                                elif attempt < max_verify_attempts - 1:
-                                    logger.warning(f"第 {attempt + 1} 次验证：finish按钮点击可能未生效，等待后重试")
-                                    time.sleep(0.5)
-                                else:
-                                    logger.warning("finish按钮点击未生效")
-                                    continue
-                            
-                            if self.finish_clicks >= 3:
-                                logger.info("=== 完成所有finish按钮点击 ===")
-                                raise Exception("完成所有操作")
+                            verify_buttons = self.detect_buttons('finish')
+                            if not verify_buttons or len(verify_buttons) < len(finish_buttons):
+                                logger.info("finish按钮点击成功（按钮消失）")
+                                self.finish_clicks += 1
+                                logger.info(f"当前finish点击次数: {self.finish_clicks}")
+                                if self.finish_clicks >= 3:
+                                    logger.info("=== 完成所有finish按钮点击 ===")
+                                    raise Exception("完成所有操作")
+                            else:
+                                logger.warning("finish按钮点击可能未生效")
                                 
                     except Exception as e:
                         if str(e) == "完成所有操作":
                             raise
                         logger.error(f"点击finish按钮失败: {e}")
-                        if not self.handle_timeout():
-                            raise Exception("finish按钮点击超时")
                 else:
-                    # 未检测到finish按钮时，继续旋转视角寻找
-                    logger.info("未检测到finish按钮，继续寻找")
-                    if not self.rotate_view():
-                        logger.warning("已旋转一圈仍未找到finish按钮")
+                    # 未检测到3个finish按钮，持续旋转视角寻找
+                    logger.info(f"未检测到3个finish按钮（当前: {len(finish_buttons)}），继续寻找")
+                    if self.rotate_view():
+                        # 旋转找到按钮后，再次验证按钮数量
+                        finish_buttons = self.detect_buttons('finish')
+                        if len(finish_buttons) < 3:
+                            logger.info(f"旋转后仍未找到3个finish按钮（当前: {len(finish_buttons)}），继续寻找")
                         self.reset_rotation()
-                        if not self.handle_timeout():
-                            raise Exception("finish按钮检测超时")
-                            
+                    else:
+                        logger.info("完成一圈旋转，继续寻找finish按钮")
+                        self.reset_rotation()
+                    return  # 返回主循环继续检测
+                        
         except Exception as e:
             if str(e) == "完成所有操作":
                 raise
             logger.error(f"处理finish状态时出错: {e}")
-            if not self.handle_timeout():
-                raise Exception("finish状态处理超时")
 
     def handle_click_menu_state(self):
         """处理菜单点击状态"""
         try:
             menu_buttons = self.detect_buttons('cook_menu')
+            logger.info(f"点击菜单状态: 检测到 {len(menu_buttons)} 个按钮, 当前点击次数: {self.menu_clicks}")
+            
             if not menu_buttons or len(menu_buttons) == 0:
                 logger.warning("未检测到菜单按钮，切换到菜单检测状态")
                 self.change_state(CookingState.DETECT_MENU)
@@ -858,6 +915,7 @@ class CookingBot:
             center_y = int(y + h // 2)
             
             logger.info(f"点击菜单按钮位置: ({center_x}, {center_y})")
+            pyautogui.click(center_x, center_y)
             pyautogui.click(center_x, center_y)
             time.sleep(1.0)  # 增加等待时间，确保界面响应
             
@@ -885,7 +943,7 @@ class CookingBot:
                             return
                     
                 if attempt < max_verify_attempts - 1:
-                    logger.info(f"第 {attempt + 1} 次验证未检测到目标按钮，等待���重试")
+                    logger.info(f"第 {attempt + 1} 次验证未检测到目标按钮，等待重试")
                     time.sleep(0.5)  # 每次验证间隔
             
             # 多次验证都失败，返回检测菜单状态
@@ -899,73 +957,68 @@ class CookingBot:
             if not self.handle_timeout():
                 raise Exception("菜单点击状态处理超时")
 
+    def reset_state(self):
+        """重置状态以开始新的循环"""
+        self.state = CookingState.DETECT_MENU
+        self.menu_clicks = 0      # 重置菜单点击次数
+        self.start_clicks = 0     # 重置开始按钮点击次数
+        self.finish_clicks = 0    # 重置完成按钮点击次数
+        self.food_clicked = False # 重置食物点击状态
+        self.food_button_pos = None  # 重置食物按钮位置
+        self.start_button_pos = None # 重置开始按钮位置
+        self.retry_count = 0      # 重置重试次数
+        self.state_start_time = datetime.now()  # 重置状态计时器
+        logger.info(f"=== 重置所有状态和计数器，准备开始第 {self.current_loop + 1} 次循环 ===")
+
     def run(self):
-        """主程序循环"""
+        """运行烹饪机器人"""
         try:
-            self.reset_state_timer()
-            self.reset_button_positions()
-            
             while self.running:
-                # 每次循环开始都检查cook按钮（如果已完成3次菜单点击）
-                if self.menu_clicks >= 3:
-                    if self.check_and_click_cook():
-                        continue
+                if self.loop_count != -1 and self.current_loop >= self.loop_count:
+                    logger.info(f"=== 完成所有 {self.loop_count} 次循环，程序结束 ===")
+                    break
+
+                try:
+                    if self.state == CookingState.DETECT_MENU:
+                        self.handle_menu_state()
+                    elif self.state == CookingState.CLICK_MENU:
+                        self.handle_click_menu_state()
+                    elif self.state == CookingState.DETECT_FOOD:
+                        self.handle_food_state()
+                    elif self.state == CookingState.DETECT_START:
+                        self.handle_start_state()
+                    elif self.state == CookingState.DETECT_FINISH:
+                        self.handle_finish_state()
+                        
+                except Exception as e:
+                    if str(e) == "完成所有操作":
+                        logger.info(f"=== 完成第 {self.current_loop + 1} 次循环 ===")
+                        self.current_loop += 1
+                        if self.loop_count == -1 or self.current_loop < self.loop_count:
+                            self.reset_state()
+                            time.sleep(1)  # 循环间隔
+                            continue
+                        else:
+                            logger.info(f"=== 完成所有 {self.loop_count} 次循环，程序结束 ===")
+                            break
+                    else:
+                        raise
+                        
+                time.sleep(0.1)  # 主循环间隔
                 
-                if self.is_state_timeout():
-                    if not self.handle_timeout():
-                        break
-                    continue
-                
-                # 正常状态处理流程
-                if self.state == CookingState.DETECT_MENU:
-                    # 检测菜单前先检查cook
-                    if self.menu_clicks >= 3 and self.check_and_click_cook():
-                        continue
-                    self.handle_menu_state()
-                
-                elif self.state == CookingState.CLICK_MENU:
-                    # 点击菜单前先检查cook
-                    if self.menu_clicks >= 3 and self.check_and_click_cook():
-                        continue
-                    self.handle_click_menu_state()
-                
-                elif self.state == CookingState.DETECT_FOOD:
-                    # 检测食物前先检查cook
-                    if self.menu_clicks >= 3 and self.check_and_click_cook():
-                        continue
-                    self.handle_food_state()
-                
-                elif self.state == CookingState.DETECT_START:
-                    # 检测开始前先检查cook
-                    if self.menu_clicks >= 3 and self.check_and_click_cook():
-                        continue
-                    self.handle_start_state()
-                
-                elif self.state == CookingState.CLICK_FINISH:
-                    # 点击完成前先检查cook
-                    if self.menu_clicks >= 3 and self.check_and_click_cook():
-                        continue
-                    self.handle_finish_state()
-                
-                # 每次状态处理后再检查一次cook
-                if self.menu_clicks >= 3:
-                    self.check_and_click_cook()
-                
-                time.sleep(0.1)
-                
+        except KeyboardInterrupt:
+            logger.info("收到键盘中断信号，程序结束")
         except Exception as e:
-            if str(e) == "完成所有操作":
-                logger.info("程序正常完成")
-            else:
-                logger.error(f"程序发生错误: {str(e)}")
+            logger.error(f"程序运行出错: {e}")
         finally:
-            self.safe_exit()
+            self.executor.shutdown()
+            logger.info("程序已退出")
 
     def get_optimized_screenshot(self):
         """获取优化后的截图"""
         current_time = time.time()
         if (self.last_screenshot is None or 
-            current_time - self.last_screenshot_time >= self.screenshot_interval):
+            current_time - self.last_screenshot_time >= 0.1):  # 直接使用固定值0.1
             screen = np.array(pyautogui.screenshot())
             screen = self.optimize_image_size(screen)
             self.last_screenshot = screen
@@ -987,7 +1040,7 @@ class CookingBot:
         roi = screen[roi_y:roi_y+roi_h, roi_x:roi_x+roi_w]
         matches = self.detect_buttons(roi, template_name)
         
-        # 调整坐标以匹配始屏幕
+        # 调整坐标以匹配始幕
         for match in matches:
             match[0] += roi_x
             match[1] += roi_y
@@ -1023,7 +1076,7 @@ class CookingBot:
             if isinstance(button, np.ndarray):
                 button = button.tolist()
             
-            # 计算并执行点击
+            # 计算并行点击
             x, y, w, h, _ = button
             center_x = x + w // 2
             center_y = y + h // 2
@@ -1065,19 +1118,18 @@ class CookingBot:
             logger.error(f"点击按钮验证失败: {e}")
             return False
 
-def main():
-    # 示例：如何使用不的食物模板
-    food_name = "natie"  # 默认使用 foods/food.png
-    bot = CookingBot(food_name)
-    
-    # 显示所有可用的食物模板
-    available_foods = bot.get_available_foods()
-    logger.info(f"可用的食物模板: {available_foods}")
-    
-    # 可以在运行过程中随时更食物
-    # bot.set_food("food2")  # 切换到 foods/food2.png
-    
-    bot.run()
-
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description='自动烹饪机器人')
+    parser.add_argument('--food', type=str, default='natie', help='食物名称')
+    parser.add_argument('--loop', type=int, default=3, help='循环次数，-1表示无限循环')
+    
+    args = parser.parse_args()
+    
+    try:
+        bot = CookingBot(food_name=args.food, loop_count=args.loop)
+            # 显示所有可用的食物模板
+        available_foods = bot.get_available_foods()
+        logger.info(f"可用的食物模板: {available_foods}")
+        bot.run()
+    except Exception as e:
+        logger.error(f"程序运行失败: {e}")

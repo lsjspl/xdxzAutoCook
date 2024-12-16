@@ -202,7 +202,7 @@ class CookingBot:
             
             all_matches = []
             scale_factors = self.scale_factors
-            threshold = 0.75
+            threshold = 0.6
             
             for template in self.food_templates:
                 template_matches = []
@@ -510,7 +510,6 @@ class CookingBot:
                     center_x = int(x + w // 2)
                     center_y = int(y + h // 2)
                     pyautogui.click(center_x, center_y)
-                    pyautogui.click(center_x, center_y)
                     logger.info(f"点击cook按钮 位置: ({center_x}, {center_y})")
                     
                     self.cook_clicks += 1
@@ -764,7 +763,6 @@ class CookingBot:
                     finish_button = finish_buttons[0].tolist() if isinstance(finish_buttons[0], np.ndarray) else list(finish_buttons[0])
                     x, y, w, h, _ = finish_button
                     pyautogui.click(int(x + w // 2), int(y + h // 2))
-                    pyautogui.click(int(x + w // 2), int(y + h // 2))
                     logger.info(f"点击遗留的finish按钮")
                     time.sleep(0.5)
                     
@@ -792,7 +790,6 @@ class CookingBot:
                             center_y = int(y + h // 2)
                             
                             logger.info(f"点击finish按钮 位置: ({center_x}, {center_y}), 置信度: {conf:.2f}")
-                            pyautogui.click(center_x, center_y)
                             pyautogui.click(center_x, center_y)
                             time.sleep(0.5)  # 点击后短暂等待
                             
