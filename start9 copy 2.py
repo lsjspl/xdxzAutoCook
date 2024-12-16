@@ -667,7 +667,6 @@ class CookingBot:
                 try:
                     cook_button = cook_buttons[0].tolist() if isinstance(cook_buttons[0], np.ndarray) else list(cook_buttons[0])
                     x, y, w, h, conf = cook_button
-                    logger.info(f"cook按钮置信度: {conf:.2f}")
                     
                     # 立即点击,不等待
                     center_x = int(x + w // 2)
@@ -682,7 +681,7 @@ class CookingBot:
                     # 检查菜单点击次数，决定下一个状态
                     if self.menu_clicks >= 3:
                         logger.info("菜单点击已完成3次，进入finish检测状态")
-                        self.change_state(CookingState.DETECT_FINISH)
+                        self.change_state(CookingState.CLICK_FINISH)
                     else:
                         logger.info(f"菜单点击次数不足（{self.menu_clicks}/3），继续点击菜单")
                         self.change_state(CookingState.CLICK_MENU)
@@ -690,8 +689,8 @@ class CookingBot:
                 except Exception as e:
                     logger.error(f"处理cook按钮时出错: {e}")
         
-        # 常规的菜单按钮检测逻辑，降低阈值到0.5
-        menu_buttons=self.menu_buttons = self.detect_buttons('cook_menu', threshold=0.6)
+        # 常规的菜单按钮检测逻辑
+        menu_buttons = self.detect_buttons('cook_menu')
         logger.info(f"当前状态: DETECT_MENU, 菜单点击次数: {self.menu_clicks}, 检测到按钮数: {len(menu_buttons)}")
         
         if len(menu_buttons) == 3 and self.menu_clicks == 0:
@@ -962,7 +961,7 @@ class CookingBot:
     def handle_click_menu_state(self):
         """处理菜单点击状态"""
         try:
-            menu_buttons = self.menu_buttons
+            menu_buttons = self.detect_buttons('cook_menu')
             logger.info(f"点击菜单状态: 检测到 {len(menu_buttons)} 个按钮, 当前点击次数: {self.menu_clicks}")
             
             if not menu_buttons or len(menu_buttons) == 0:
