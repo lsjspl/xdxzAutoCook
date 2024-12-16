@@ -981,7 +981,6 @@ class CookingBot:
             
             logger.info(f"点击菜单按钮位置: ({center_x}, {center_y})")
             pyautogui.click(center_x, center_y)
-            pyautogui.click(center_x, center_y)
             time.sleep(1.5)  # 增加等待时间，确保界面响应
             
             # 点击后验证：多次尝试检测食物或开始按钮
@@ -990,7 +989,7 @@ class CookingBot:
                 if self.food_clicked:
                     # 果已经选择过食物，使用保存的开始按钮位置
                     if self.start_button_pos:
-                        logger.info("菜单点击成功，使用已保存的开始按钮位置")
+                        logger.info("菜单点击成功，使用已保存的开始食物位置")
                         self.menu_clicks += 1
                         logger.info(f"当前菜单点击次数: {self.menu_clicks}")
                         self.change_state(CookingState.DETECT_START)
@@ -1194,7 +1193,7 @@ class CookingBot:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='自动烹饪机器人')
     parser.add_argument('--food', type=str, default='葡萄酱', help='食物名称')
-    parser.add_argument('--loop', type=int, default=3, help='循环次数，-1表示无限循环')
+    parser.add_argument('--loop', type=int, default=10, help='循环次数，-1表示无限循环')
     
     args = parser.parse_args()
     
