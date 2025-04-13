@@ -292,18 +292,52 @@ class CookingBot:
                     time.sleep(0.5)
                     self.update_window_rect()
                 
-                # 激活窗口并置于前台
+                # 尝试多种方式激活窗口
                 logger.info("正在激活心动小镇窗口...")
                 
-                # 有时SetForegroundWindow会失败, 需要先发送Alt键激活
+                # 1. 先发送Alt键激活
                 shell = win32com.client.Dispatch("WScript.Shell")
                 shell.SendKeys('%')
+                time.sleep(0.1)
                 
+                # 2. 使用SetForegroundWindow
+                win32gui.SetForegroundWindow(game_hwnd)
+                time.sleep(0.1)
+                
+                # 3. 使用SetWindowPos确保窗口在最前
+                win32gui.SetWindowPos(
+                    game_hwnd,
+                    win32con.HWND_TOPMOST,  # 置顶
+                    0, 0, 0, 0,
+                    win32con.SWP_NOMOVE | win32con.SWP_NOSIZE
+                )
+                time.sleep(0.1)
+                
+                # 4. 再次尝试SetForegroundWindow
+                win32gui.SetForegroundWindow(game_hwnd)
+                time.sleep(0.1)
+                
+                # 5. 取消置顶但保持在前台
+                win32gui.SetWindowPos(
+                    game_hwnd,
+                    win32con.HWND_NOTOPMOST,  # 取消置顶
+                    0, 0, 0, 0,
+                    win32con.SWP_NOMOVE | win32con.SWP_NOSIZE
+                )
+                time.sleep(0.1)
+                
+                # 6. 最后再次尝试SetForegroundWindow
                 win32gui.SetForegroundWindow(game_hwnd)
                 
                 # 等待窗口切换完成
                 time.sleep(1)
-                logger.info("心动小镇窗口已激活")
+                
+                # 验证窗口是否真的激活
+                active_hwnd = win32gui.GetForegroundWindow()
+                if active_hwnd == game_hwnd:
+                    logger.info("心动小镇窗口已成功激活")
+                else:
+                    logger.warning("窗口激活可能未成功，当前活动窗口不是心动小镇")
                 
                 # 打印窗口尺寸信息
                 if self.window_rect:
