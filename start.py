@@ -3,7 +3,6 @@ import pyautogui
 import numpy as np
 import os
 import time
-import tkinter as tk
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
@@ -15,6 +14,9 @@ import argparse
 import win32gui
 import win32con
 import win32com.client
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget
+from PyQt5.QtCore import Qt, QPoint, QTimer
+from PyQt5.QtGui import QPainter, QColor, QPen, QFont
 
 # 配置日志
 logging.basicConfig(
@@ -37,127 +39,90 @@ class CookingState(Enum):
     DETECT_FINISH = auto()  # 检测Finish按钮
 
 
-class OverlayWindow:
+class OverlayWindow(QMainWindow):
     def __init__(self):
-        """初始化覆盖窗口"""
-        self.root = tk.Tk()
-        self.root.title("Overlay")
-        self.root.attributes('-alpha', 1.0, '-topmost', True)
-        self.root.attributes('-fullscreen', True)
-        self.root.configure(bg='black')
-        self.root.attributes('-transparentcolor', 'black')
-
-        self.canvas = tk.Canvas(
-            self.root,
-            highlightthickness=0,
-            bg='black'
+        super().__init__()
+        self.setWindowTitle("Overlay")
+        # 设置窗口标志
+        self.setWindowFlags(
+            Qt.FramelessWindowHint |  # 无边框
+            Qt.WindowStaysOnTopHint |  # 置顶
+            Qt.Tool |  # 工具窗口
+            Qt.X11BypassWindowManagerHint  # 绕过窗口管理器
         )
-        self.canvas.pack(fill='both', expand=True)
+        # 设置窗口属性
+        self.setAttribute(Qt.WA_TranslucentBackground)  # 透明背景
+        self.setAttribute(Qt.WA_NoSystemBackground)  # 无系统背景
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)  # 鼠标事件穿透
         
-        # 添加鼠标状态显示相关变量
-        self.mouse_position = None  # 当前鼠标位置
-        self.mouse_is_down = False  # 鼠标按下状态
-        self.mouse_circle_id = None  # 鼠标圆圈的Canvas ID
-        self.drag_line_id = None    # 拖动线条的Canvas ID
-        self.drag_start_pos = None  # 拖动起始位置
-
+        # 创建中央部件
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        
+        # 设置窗口为全屏
+        screen = QApplication.primaryScreen().geometry()
+        self.setGeometry(screen)
+        
+        self.matches = []
+        self.button_name = None
+        
+        # 设置定时器用于更新显示，使用更快的刷新率
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update)
+        self.timer.start(8)  # 约120fps
+        
+        # 设置窗口透明度
+        self.setWindowOpacity(0.8)
+        
     def update_overlay(self, matches, button_name=None):
-        """更新覆盖层显示
+        """更新覆盖层显示"""
+        self.matches = matches
+        self.button_name = button_name
+        self.update()
         
-        Args:
-            matches: 匹配的按钮列表，每个元素为 [x, y, w, h, conf]
-            button_name: 按钮名称，如果提供则显示
-        """
-        self.canvas.delete('all')  # 清除之前的矩形
-
-        for match in matches:
-            x, y, w, h, conf = match
+    def paintEvent(self, event):
+        """绘制事件处理"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+        
+        # 清除之前的绘制
+        painter.setCompositionMode(QPainter.CompositionMode_Clear)
+        painter.fillRect(self.rect(), Qt.transparent)
+        painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
+        
+        # 绘制匹配的矩形框
+        for match in self.matches:
+            # 将numpy.float64转换为整数
+            x = int(match[0])
+            y = int(match[1])
+            w = int(match[2])
+            h = int(match[3])
+            conf = float(match[4])
+            
             # 绘制绿色矩形框
-            self.canvas.create_rectangle(
-                x, y, x + w, y + h,
-                outline='green',
-                width=5
-
-            )
+            pen = QPen(QColor(0, 255, 0))
+            pen.setWidth(2)  # 进一步减小线条宽度
+            painter.setPen(pen)
+            painter.drawRect(x, y, w, h)
+            
             # 显示按钮名称和置信度
             display_text = f'{conf:.2f}'
-            if button_name:
-                display_text = f'{button_name}: {display_text}'
+            if self.button_name:
+                display_text = f'{self.button_name}: {display_text}'
                 
-            self.canvas.create_text(
-                x, y - 10,
-                text=display_text,
-                fill='green',
-                anchor='sw',
-                font=('TkDefaultFont', 14, 'bold')  # 使用默认字体
-            )
+            font = QFont()
+            font.setBold(True)
+            font.setPointSize(10)  # 进一步减小字体大小
+            painter.setFont(font)
+            painter.setPen(QColor(0, 255, 0))
+            painter.drawText(x, y - 3, display_text)  # 进一步减小文本偏移
             
-        # 重新绘制鼠标状态
-        self.draw_mouse_state()
-        
-        self.root.update()
-        
-    def draw_mouse_state(self):
-        """绘制鼠标状态"""
-        if self.mouse_position:
-            x, y = self.mouse_position
-            
-            # 绘制白色圆圈表示鼠标位置
-            circle_radius = 10
-            circle_color = 'yellow'
-            circle_width = 2
-            
-            if self.mouse_is_down:
-                # 如果鼠标按下，使用填充圆圈
-                self.mouse_circle_id = self.canvas.create_oval(
-                    x - circle_radius, y - circle_radius,
-                    x + circle_radius, y + circle_radius,
-                    outline=circle_color,
-                    fill=circle_color,
-                    width=circle_width
-                )
-                
-                # 如果是拖动状态，绘制拖动线
-                if self.drag_start_pos:
-                    start_x, start_y = self.drag_start_pos
-                    self.drag_line_id = self.canvas.create_line(
-                        start_x, start_y, x, y,
-                        fill=circle_color,
-                        width=2,
-                        dash=(4, 4)  # 虚线
-                    )
-            else:
-                return
-                # 如果鼠标释放，使用空心圆圈
-                # self.mouse_circle_id = self.canvas.create_oval(
-                #     x - circle_radius, y - circle_radius,
-                #     x + circle_radius, y + circle_radius,
-                #     outline=circle_color,
-                #     width=circle_width
-                # )
-    
-    def update_mouse_state(self, position, is_down, is_drag=False):
-        """更新鼠标状态
-        
-        Args:
-            position: 鼠标位置(x, y)
-            is_down: 鼠标是否按下
-            is_drag: 是否处于拖动状态
-        """
-        self.mouse_position = position
-        self.mouse_is_down = is_down
-        
-        # 处理拖动状态
-        if is_drag and is_down and self.drag_start_pos is None:
-            # 开始拖动
-            self.drag_start_pos = position
-        elif not is_down:
-            # 拖动结束
-            self.drag_start_pos = None
-            
-        # 更新绘制
-        self.draw_mouse_state()
-        self.root.update()
+                    
+    def closeEvent(self, event):
+        """窗口关闭事件处理"""
+        self.timer.stop()
+        event.accept()
 
 
 class CookingBot:
@@ -167,10 +132,12 @@ class CookingBot:
         :param food_name: 食物模板的名称（不包含.png后缀）
         :param loop_count: 循环执行次数，-1表示无限循环
         """
-        # 查找并激活心动小镇窗口
-        self.game_hwnd = None  # 存储游戏窗口句柄
-        self.window_rect = None  # 存储游戏窗口位置和大小
-        self.find_and_activate_game_window()
+        # 创建QApplication实例
+        self.app = QApplication(sys.argv)
+        
+        # 初始化游戏窗口句柄和位置
+        self.game_hwnd = None
+        self.window_rect = None
 
         self.state = CookingState.DETECT_MENU_AND_COOK
         self.menu_clicks = 0
@@ -207,7 +174,11 @@ class CookingBot:
         self.templates = self.load_templates()
         self.food_templates = self.load_food_templates()
 
+        # 创建并显示遮罩窗口
         self.overlay = OverlayWindow()
+        self.overlay.show()
+        
+   
 
         keyboard.add_hotkey('ctrl+q', self.stop)
         logger.info(f"当前选择的食物: {food_name}")
@@ -394,29 +365,13 @@ class CookingBot:
         return False
     
     def capture_window_screenshot(self):
-        """截取游戏窗口的截图"""
+        """截取全屏截图"""
         try:
-            # 更新窗口位置和大小
-            self.update_window_rect()
-            
-            if not self.window_rect:
-                logger.warning("无法获取窗口位置，将使用全屏截图")
-                return np.array(pyautogui.screenshot())
-            
-            left, top, right, bottom = self.window_rect
-            width = right - left
-            height = bottom - top
-            
-            if width <= 0 or height <= 0:
-                logger.warning(f"窗口尺寸异常 (宽={width}, 高={height})，将使用全屏截图")
-                return np.array(pyautogui.screenshot())
-            
-            # 使用pyautogui截取窗口区域
-            screenshot = pyautogui.screenshot(region=(left, top, width, height))
+            # 直接使用pyautogui截取全屏
+            screenshot = pyautogui.screenshot()
             return np.array(screenshot)
         except Exception as e:
-            logger.error(f"窗口截图失败: {e}")
-            logger.info("回退到全屏截图")
+            logger.error(f"全屏截图失败: {e}")
             return np.array(pyautogui.screenshot())
 
     def get_screenshot(self):
@@ -579,9 +534,6 @@ class CookingBot:
             screen_bgr = cv2.cvtColor(screen, cv2.COLOR_RGB2BGR)
             screen_processed = self.preprocess_image(screen_bgr)
 
-            # 保存处理后的截图用于调试
-            cv2.imwrite('./debug/debug_screen.png', screen_processed)
-
             template_list = self.templates.get(template_name, [])
             if not template_list:
                 logger.error(f"没有找到模板: {template_name}")
@@ -590,9 +542,6 @@ class CookingBot:
             all_matches = []
 
             for idx, template in enumerate(template_list):
-                # 保存处理后的模板用于调试
-                cv2.imwrite(f'./debug/debug_template_{template_name}_{idx}.png', template)
-
                 template_matches = []
 
                 for scale in self.scale_factors:
@@ -612,10 +561,6 @@ class CookingBot:
                         scaled_template,
                         cv2.TM_CCOEFF_NORMED
                     )
-
-                    # 输出最大匹配值
-                    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-                    logger.debug(f"模板 {template_name}_{idx} 在缩放 {scale:.2f} 下的最大匹配值: {max_val:.3f}")
 
                     locations = np.where(result >= threshold)
                     h, w = scaled_template.shape[:2]
@@ -644,8 +589,7 @@ class CookingBot:
 
                 if len(indices) > 0:
                     best_matches = rectangles[indices.flatten()]
-                    logger.debug(f"[{template_name}] 检测到 {len(best_matches)} 个按钮"
-                                 f"置信度: {[f'{match[4]:.2f}' for match in best_matches]}")
+                    logger.debug(f"[{template_name}] 检测到 {len(best_matches)} 个按钮")
                     self.overlay.update_overlay(best_matches, button_name=template_name)
                     return best_matches.tolist()
 
@@ -655,45 +599,6 @@ class CookingBot:
 
         except Exception as e:
             logger.error(f"按钮检测失败: {e}")
-            return []
-
-    def process_scale(self, screen, template, scale, threshold):
-        """优化的单一尺度处理"""
-        try:
-            if scale != 1.0:
-                scaled_template = cv2.resize(
-                    template,
-                    None,
-                    fx=scale,
-                    fy=scale,
-                    interpolation=cv2.INTER_LINEAR
-                )
-            else:
-                scaled_template = template
-
-            result = cv2.matchTemplate(
-                screen,
-                scaled_template,
-                cv2.TM_CCOEFF_NORMED
-            )
-
-            locations = np.where(result >= threshold)
-            h, w = scaled_template.shape[:2]
-
-            matches = []
-            for pt in zip(*locations[::-1]):
-                matches.append([
-                    int(pt[0]),
-                    int(pt[1]),
-                    int(w),
-                    int(h),
-                    float(result[pt[1], pt[0]])
-                ])
-
-            return matches
-
-        except Exception as e:
-            logger.error(f"尺度处理失败: {e}")
             return []
 
     def set_food(self, food_name):
@@ -743,27 +648,22 @@ class CookingBot:
             pyautogui.mouseUp(button='left')
             # 获取当前鼠标位置
             current_pos = pyautogui.position()
-            # 更新鼠标状态为释放
-            self.overlay.update_mouse_state((current_pos.x, current_pos.y), False)
             
             keyboard.unhook_all()
             self.executor.shutdown()
-            self.overlay.root.destroy()
+            self.overlay.close()
             logger.info("程序已安全退出")
         except Exception as e:
             logger.error(f"退出时发生错误: {e}")
-
 
     def reset_state_timer(self):
         """重置状态计时器"""
         self.state_start_time = datetime.now()
         self.retry_count = 0
 
-
     def is_state_timeout(self):
         """检查当前状态是否超时"""
         return (datetime.now() - self.state_start_time).total_seconds() > self.timeout
-
 
     def handle_timeout(self):
         """处理超时情况"""
@@ -778,24 +678,47 @@ class CookingBot:
                 return False
         return True
 
-
     def change_state(self, new_state):
         """切换状态"""
-        logger.info(f"状态切换: {self.state} -> {new_state}, 当前菜单点击次数: {self.menu_clicks}")
+        logger.info(f"状态切换: {self.state} -> {new_state}")
         self.state = new_state
         self.reset_state_timer()
 
+    def mouse_click(self, x, y, double_click=False, delay=0.1):
+        """使用mouseDown和mouseUp模拟点击
+        
+        Args:
+            x: 鼠标x坐标
+            y: 鼠标y坐标
+            double_click: 是否双击
+            delay: 按下和释放之间的延迟
+        """
+        try:
+            # 第一次点击
+            pyautogui.mouseDown(x=x, y=y, button='left')
+            time.sleep(delay)  # 按下后稍等片刻
+            pyautogui.mouseUp(x=x, y=y, button='left')
+            
+            # 如果是双击，再点击一次
+            if double_click:
+                time.sleep(0.05)  # 两次点击之间短暂停顿
+                pyautogui.mouseDown(x=x, y=y, button='left')
+                time.sleep(delay)  # 按下后稍等片刻
+                pyautogui.mouseUp(x=x, y=y, button='left')
+            
+            logger.debug(f"模拟点击: ({x}, {y}), 双击: {double_click}")
+            
+        except Exception as e:
+            logger.error(f"模拟点击失败: {e}")
+            # 确保鼠标按键被释放
+            try:
+                pyautogui.mouseUp(button='left')
+            except:
+                pass
 
     def handle_menu_state(self):
         """处理菜单和cook按钮检测状态，优先点击cook按钮"""
         try:
-            # 确保窗口保持激活状态
-            active_window_title = self.get_active_window_title()
-            if active_window_title and "心动小镇" not in active_window_title:
-                logger.warning("心动小镇窗口不在前台，尝试重新激活...")
-                self.find_and_activate_game_window()
-                time.sleep(0.5)  # 等待窗口激活
-            
             # 1. 首先检测cook按钮，如果有就优先点击
             cook_buttons = self.detect_buttons('cook', threshold=0.6)
             if cook_buttons and len(cook_buttons) > 0:
@@ -828,7 +751,7 @@ class CookingBot:
             
             # 3. 检测菜单按钮
             menu_buttons = self.detect_buttons('cook_menu', threshold=0.6)
-            logger.info(f"当前状态: DETECT_MENU_AND_COOK, 检测到菜单按钮数: {len(menu_buttons)}, start点击次数: {self.start_clicks}")
+            logger.info(f"当前状态: DETECT_MENU_AND_COOK, 检测到菜单按钮数: {len(menu_buttons)}")
             
             # 如果找到了菜单按钮，选择一个未点击过的进行点击
             if menu_buttons and len(menu_buttons) > 0:
@@ -837,7 +760,6 @@ class CookingBot:
                     logger.info("=== 检测到3个菜单按钮，保存位置 ===")
                     self.found_menu_buttons = True
                 
-                    
                 # 点击选中的菜单按钮
                 menu_button = menu_buttons[0]
                 
@@ -865,20 +787,10 @@ class CookingBot:
             logger.error(f"处理菜单和cook按钮状态时出错: {e}")
             if not self.handle_timeout():
                 raise Exception("菜单和cook按钮检测状态处理超时")
-    
-    def get_active_window_title(self):
-        """获取当前活动窗口的标题"""
-        try:
-            hwnd = win32gui.GetForegroundWindow()
-            return win32gui.GetWindowText(hwnd)
-        except Exception as e:
-            logger.error(f"获取活动窗口标题失败: {e}")
-            return None
 
     def handle_food_state(self):
         """处理食物和start按钮检测状态"""
         try:
-            
             # 2. 检测食物按钮
             if not self.food_clicked:
                 food_buttons = self.detect_food()
@@ -951,7 +863,6 @@ class CookingBot:
                 except Exception as e:
                     logger.error(f"点击start按钮失败: {e}")
             
-            
             # 如果长时间未找到按钮，返回菜单检测状态
             if self.is_state_timeout():
                 logger.warning("长时间未找到食物或start按钮，返回菜单检测状态")
@@ -966,11 +877,9 @@ class CookingBot:
             if not self.handle_timeout():
                 raise Exception("食物和start按钮检测状态处理超时")
 
-
     def handle_finish_state(self):
         """处理finish按钮检测和点击状态"""
         try:
-            
             logger.info(f"=== 开始依次点击 {len(self.finish_button_positions)} 个finish按钮 ===")
             for i, finish_button in enumerate(self.finish_button_positions):
                 # 每次点击前检查cook按钮
@@ -994,12 +903,12 @@ class CookingBot:
                 center_x = int(x + w // 2)
                 center_y = int(y + h // 2)
 
-                logger.info(f"点击finish按钮 {i+1}/3 位置: ({center_x}, {center_y}), 置信度: {conf:.2f}")
+                logger.info(f"点击finish按钮 {i+1}/3 位置: ({center_x}, {center_y})")
                 self.mouse_click(center_x, center_y, double_click=False)
                 time.sleep(0.5)  # 点击后短暂等待
                 self.finish_clicks += 1
             
-            # 4. 验证是否成功点击了所有finish按钮
+            # 验证是否成功点击了所有finish按钮
             finish_buttons = self.detect_buttons('finish')
             if not finish_buttons or len(finish_buttons) == 0:
                 logger.info("=== 成功点击了所有finish按钮（按钮数量减少） ===")
@@ -1025,7 +934,6 @@ class CookingBot:
             logger.error(f"处理finish按钮状态时出错: {e}")
             # 发生错误时返回菜单检测状态
             self.change_state(CookingState.DETECT_MENU_AND_COOK)
-
 
     def reset_state(self):
         """重置状态以开始新的循环"""
@@ -1062,12 +970,9 @@ class CookingBot:
         else:
             logger.info("=== 尚未找到菜单按钮位置，需要重新旋转寻找 ===")
 
-
     def run(self):
         """运行烹饪机器人"""
         try:
-            # 确保在开始主循环前窗口处于激活状态
-            self.find_and_activate_game_window()
             logger.info("开始自动烹饪流程...")
             logger.info("使用窗口截图模式，只截取心动小镇窗口区域")
             
@@ -1119,6 +1024,8 @@ class CookingBot:
                     else:
                         raise
 
+                # 处理Qt事件
+                self.app.processEvents()
                 time.sleep(0.1)  # 主循环间隔
 
         except KeyboardInterrupt:
@@ -1127,6 +1034,7 @@ class CookingBot:
             logger.error(f"程序运行出错: {e}")
         finally:
             self.executor.shutdown()
+            self.overlay.close()
             logger.info("程序已退出")
 
 
@@ -1258,53 +1166,6 @@ class CookingBot:
         except Exception as e:
             logger.error(f"保存调试图像失败: {e}")
 
-    def mouse_click(self, x, y, double_click=False, delay=0.1):
-        """使用mouseDown和mouseUp模拟点击
-        
-        Args:
-            x: 鼠标x坐标
-            y: 鼠标y坐标
-            double_click: 是否双击
-            delay: 按下和释放之间的延迟
-        """
-        try:
-            # 移动到位置
-            # pyautogui.moveTo(x, y)
-            # 更新鼠标位置显示（鼠标释放状态）
-            self.overlay.update_mouse_state((x, y), False)
-            
-            # 第一次点击
-            pyautogui.mouseDown(x=x, y=y, button='left')
-            # 更新鼠标状态为按下
-            self.overlay.update_mouse_state((x, y), True)
-            time.sleep(delay)  # 按下后稍等片刻
-            pyautogui.mouseUp(x=x, y=y, button='left')
-            # 更新鼠标状态为释放
-            self.overlay.update_mouse_state((x, y), False)
-            
-            # 如果是双击，再点击一次
-            if double_click:
-                time.sleep(0.05)  # 两次点击之间短暂停顿
-                pyautogui.mouseDown(x=x, y=y, button='left')
-                # 更新鼠标状态为按下
-                self.overlay.update_mouse_state((x, y), True)
-                time.sleep(delay)  # 按下后稍等片刻
-                pyautogui.mouseUp(x=x, y=y, button='left')
-                # 更新鼠标状态为释放
-                self.overlay.update_mouse_state((x, y), False)
-            
-            logger.debug(f"模拟点击: ({x}, {y}), 双击: {double_click}")
-            
-        except Exception as e:
-            logger.error(f"模拟点击失败: {e}")
-            # 确保鼠标按键被释放
-            try:
-                pyautogui.mouseUp(button='left')
-                # 更新鼠标状态为释放
-                self.overlay.update_mouse_state((x, y), False)
-            except:
-                pass
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='自动烹饪机器人')
@@ -1319,5 +1180,7 @@ if __name__ == "__main__":
         available_foods = bot.get_available_foods()
         logger.info(f"可用的食物模板: {available_foods}")
         bot.run()
+             # 查找并激活心动小镇窗口
+        bot.find_and_activate_game_window()
     except Exception as e:
         logger.error(f"程序运行失败: {e}")
