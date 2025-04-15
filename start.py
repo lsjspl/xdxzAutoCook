@@ -833,7 +833,7 @@ class CookingBot:
                     center_y = int(y + h // 2)
                     self.mouse_click(center_x, center_y, double_click=False)
                     logger.info(f"点击start按钮 位置: ({center_x}, {center_y})")
-                    time.sleep(0.5)
+                    time.sleep(0.7)
                     
                     # 验证点击是否成功
                     verify_buttons = self.detect_buttons('cook_start', threshold=0.5)
@@ -862,15 +862,14 @@ class CookingBot:
                             time.sleep(0.5)
                 except Exception as e:
                     logger.error(f"点击start按钮失败: {e}")
+            else:
+                self.change_state(CookingState.DETECT_MENU_AND_COOK)
             
             # 如果长时间未找到按钮，返回菜单检测状态
             if self.is_state_timeout():
                 logger.warning("长时间未找到食物或start按钮，返回菜单检测状态")
                 self.change_state(CookingState.DETECT_MENU_AND_COOK)
                 return
-            
-            # 等待一段时间后继续检测
-            time.sleep(0.5)
                 
         except Exception as e:
             logger.error(f"处理食物和start按钮状态时出错: {e}")
@@ -882,21 +881,6 @@ class CookingBot:
         try:
             logger.info(f"=== 开始依次点击 {len(self.finish_button_positions)} 个finish按钮 ===")
             for i, finish_button in enumerate(self.finish_button_positions):
-                # 每次点击前检查cook按钮
-                cook_buttons = self.detect_buttons('cook', threshold=0.6)
-                if cook_buttons and len(cook_buttons) > 0:
-                    logger.info("=== 点击finish前检测到cook按钮，优先处理 ===")
-                    cook_button = cook_buttons[0].tolist() if isinstance(cook_buttons[0], np.ndarray) else list(
-                        cook_buttons[0])
-                    x, y, w, h, conf = cook_button
-                    center_x = int(x + w // 2)
-                    center_y = int(y + h // 2)
-                    self.mouse_click(center_x, center_y, double_click=False)
-                    logger.info(f"点击cook按钮 位置: ({center_x}, {center_y})")
-                    self.cook_clicks += 1
-                    self.change_state(CookingState.DETECT_MENU_AND_COOK)
-                    return
-                
                 # 点击当前finish按钮
                 button_data = finish_button.tolist() if isinstance(finish_button, np.ndarray) else list(finish_button)
                 x, y, w, h, conf = button_data
@@ -905,7 +889,7 @@ class CookingBot:
 
                 logger.info(f"点击finish按钮 {i+1}/3 位置: ({center_x}, {center_y})")
                 self.mouse_click(center_x, center_y, double_click=False)
-                time.sleep(0.5)  # 点击后短暂等待
+                time.sleep(0.6)  # 点击后短暂等待
                 self.finish_clicks += 1
             
             # 验证是否成功点击了所有finish按钮
@@ -1169,7 +1153,7 @@ class CookingBot:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='自动烹饪机器人')
-    parser.add_argument('--food', type=str, default='葡萄酱', help='食物名称')
+    parser.add_argument('--food', type=str, default='烤草莓棉花糖', help='食物名称')
     parser.add_argument('--loop', type=int, default=-1, help='循环次数，-1表示无限循环')
 
     args = parser.parse_args()
