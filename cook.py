@@ -63,10 +63,6 @@ class OverlayWindow(QMainWindow):
         screen = QApplication.primaryScreen().geometry()
         self.setGeometry(screen)
         
-        # 添加鼠标状态显示相关变量
-        self.mouse_position = None
-        self.mouse_is_down = False
-        self.drag_start_pos = None
         self.matches = []
         self.button_name = None
         
@@ -82,18 +78,6 @@ class OverlayWindow(QMainWindow):
         """更新覆盖层显示"""
         self.matches = matches
         self.button_name = button_name
-        self.update()
-        
-    def update_mouse_state(self, position, is_down, is_drag=False):
-        """更新鼠标状态"""
-        self.mouse_position = position
-        self.mouse_is_down = is_down
-        
-        if is_drag and is_down and self.drag_start_pos is None:
-            self.drag_start_pos = position
-        elif not is_down:
-            self.drag_start_pos = None
-            
         self.update()
         
     def paintEvent(self, event):
@@ -134,31 +118,6 @@ class OverlayWindow(QMainWindow):
             painter.setPen(QColor(0, 255, 0))
             painter.drawText(x, y - 3, display_text)  # 进一步减小文本偏移
             
-        # 绘制鼠标状态 - 只在鼠标按下时显示，且使用更轻量的效果
-        if self.mouse_position and self.mouse_is_down:
-            x, y = self.mouse_position
-            # 确保坐标是整数
-            x = int(x)
-            y = int(y)
-            
-            # 使用更小的圆圈和更细的线条
-            circle_radius = 60  # 更小的圆圈
-            circle_color = QColor(255, 255, 0, 128)  # 半透明黄色
-            
-            # 绘制空心圆圈
-            painter.setPen(QPen(circle_color, 1))  # 更细的线条
-            painter.setBrush(Qt.NoBrush)  # 不填充
-            painter.drawEllipse(QPoint(x, y), circle_radius, circle_radius)
-            
-            # 如果是拖动状态，绘制更细的虚线
-            if self.drag_start_pos:
-                start_x, start_y = self.drag_start_pos
-                # 确保坐标是整数
-                start_x = int(start_x)
-                start_y = int(start_y)
-                pen = QPen(circle_color, 1, Qt.DashLine)  # 更细的虚线
-                painter.setPen(pen)
-                painter.drawLine(start_x, start_y, x, y)
                     
     def closeEvent(self, event):
         """窗口关闭事件处理"""
@@ -219,8 +178,7 @@ class CookingBot:
         self.overlay = OverlayWindow()
         self.overlay.show()
         
-        # 查找并激活心动小镇窗口
-        self.find_and_activate_game_window()
+   
 
         keyboard.add_hotkey('ctrl+q', self.stop)
         logger.info(f"当前选择的食物: {food_name}")
@@ -576,9 +534,6 @@ class CookingBot:
             screen_bgr = cv2.cvtColor(screen, cv2.COLOR_RGB2BGR)
             screen_processed = self.preprocess_image(screen_bgr)
 
-            # 保存处理后的截图用于调试
-            cv2.imwrite('./debug/debug_screen.png', screen_processed)
-
             template_list = self.templates.get(template_name, [])
             if not template_list:
                 logger.error(f"没有找到模板: {template_name}")
@@ -587,9 +542,6 @@ class CookingBot:
             all_matches = []
 
             for idx, template in enumerate(template_list):
-                # 保存处理后的模板用于调试
-                cv2.imwrite(f'./debug/debug_template_{template_name}_{idx}.png', template)
-
                 template_matches = []
 
                 for scale in self.scale_factors:
@@ -609,10 +561,6 @@ class CookingBot:
                         scaled_template,
                         cv2.TM_CCOEFF_NORMED
                     )
-
-                    # 输出最大匹配值
-                    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-                    logger.debug(f"模板 {template_name}_{idx} 在缩放 {scale:.2f} 下的最大匹配值: {max_val:.3f}")
 
                     locations = np.where(result >= threshold)
                     h, w = scaled_template.shape[:2]
@@ -641,8 +589,7 @@ class CookingBot:
 
                 if len(indices) > 0:
                     best_matches = rectangles[indices.flatten()]
-                    logger.debug(f"[{template_name}] 检测到 {len(best_matches)} 个按钮"
-                                 f"置信度: {[f'{match[4]:.2f}' for match in best_matches]}")
+                    logger.debug(f"[{template_name}] 检测到 {len(best_matches)} 个按钮")
                     self.overlay.update_overlay(best_matches, button_name=template_name)
                     return best_matches.tolist()
 
@@ -652,45 +599,6 @@ class CookingBot:
 
         except Exception as e:
             logger.error(f"按钮检测失败: {e}")
-            return []
-
-    def process_scale(self, screen, template, scale, threshold):
-        """优化的单一尺度处理"""
-        try:
-            if scale != 1.0:
-                scaled_template = cv2.resize(
-                    template,
-                    None,
-                    fx=scale,
-                    fy=scale,
-                    interpolation=cv2.INTER_LINEAR
-                )
-            else:
-                scaled_template = template
-
-            result = cv2.matchTemplate(
-                screen,
-                scaled_template,
-                cv2.TM_CCOEFF_NORMED
-            )
-
-            locations = np.where(result >= threshold)
-            h, w = scaled_template.shape[:2]
-
-            matches = []
-            for pt in zip(*locations[::-1]):
-                matches.append([
-                    int(pt[0]),
-                    int(pt[1]),
-                    int(w),
-                    int(h),
-                    float(result[pt[1], pt[0]])
-                ])
-
-            return matches
-
-        except Exception as e:
-            logger.error(f"尺度处理失败: {e}")
             return []
 
     def set_food(self, food_name):
@@ -740,8 +648,6 @@ class CookingBot:
             pyautogui.mouseUp(button='left')
             # 获取当前鼠标位置
             current_pos = pyautogui.position()
-            # 更新鼠标状态为释放
-            self.overlay.update_mouse_state((current_pos.x, current_pos.y), False)
             
             keyboard.unhook_all()
             self.executor.shutdown()
@@ -750,17 +656,14 @@ class CookingBot:
         except Exception as e:
             logger.error(f"退出时发生错误: {e}")
 
-
     def reset_state_timer(self):
         """重置状态计时器"""
         self.state_start_time = datetime.now()
         self.retry_count = 0
 
-
     def is_state_timeout(self):
         """检查当前状态是否超时"""
         return (datetime.now() - self.state_start_time).total_seconds() > self.timeout
-
 
     def handle_timeout(self):
         """处理超时情况"""
@@ -775,24 +678,47 @@ class CookingBot:
                 return False
         return True
 
-
     def change_state(self, new_state):
         """切换状态"""
-        logger.info(f"状态切换: {self.state} -> {new_state}, 当前菜单点击次数: {self.menu_clicks}")
+        logger.info(f"状态切换: {self.state} -> {new_state}")
         self.state = new_state
         self.reset_state_timer()
 
+    def mouse_click(self, x, y, double_click=False, delay=0.1):
+        """使用mouseDown和mouseUp模拟点击
+        
+        Args:
+            x: 鼠标x坐标
+            y: 鼠标y坐标
+            double_click: 是否双击
+            delay: 按下和释放之间的延迟
+        """
+        try:
+            # 第一次点击
+            pyautogui.mouseDown(x=x, y=y, button='left')
+            time.sleep(delay)  # 按下后稍等片刻
+            pyautogui.mouseUp(x=x, y=y, button='left')
+            
+            # 如果是双击，再点击一次
+            if double_click:
+                time.sleep(0.05)  # 两次点击之间短暂停顿
+                pyautogui.mouseDown(x=x, y=y, button='left')
+                time.sleep(delay)  # 按下后稍等片刻
+                pyautogui.mouseUp(x=x, y=y, button='left')
+            
+            logger.debug(f"模拟点击: ({x}, {y}), 双击: {double_click}")
+            
+        except Exception as e:
+            logger.error(f"模拟点击失败: {e}")
+            # 确保鼠标按键被释放
+            try:
+                pyautogui.mouseUp(button='left')
+            except:
+                pass
 
     def handle_menu_state(self):
         """处理菜单和cook按钮检测状态，优先点击cook按钮"""
         try:
-            # 确保窗口保持激活状态
-            # active_window_title = self.get_active_window_title()
-            # if active_window_title and "心动小镇" not in active_window_title:
-            #     logger.warning("心动小镇窗口不在前台，尝试重新激活...")
-            #     self.find_and_activate_game_window()
-            #     time.sleep(0.5)  # 等待窗口激活
-            
             # 1. 首先检测cook按钮，如果有就优先点击
             cook_buttons = self.detect_buttons('cook', threshold=0.6)
             if cook_buttons and len(cook_buttons) > 0:
@@ -825,7 +751,7 @@ class CookingBot:
             
             # 3. 检测菜单按钮
             menu_buttons = self.detect_buttons('cook_menu', threshold=0.6)
-            logger.info(f"当前状态: DETECT_MENU_AND_COOK, 检测到菜单按钮数: {len(menu_buttons)}, start点击次数: {self.start_clicks}")
+            logger.info(f"当前状态: DETECT_MENU_AND_COOK, 检测到菜单按钮数: {len(menu_buttons)}")
             
             # 如果找到了菜单按钮，选择一个未点击过的进行点击
             if menu_buttons and len(menu_buttons) > 0:
@@ -834,7 +760,6 @@ class CookingBot:
                     logger.info("=== 检测到3个菜单按钮，保存位置 ===")
                     self.found_menu_buttons = True
                 
-                    
                 # 点击选中的菜单按钮
                 menu_button = menu_buttons[0]
                 
@@ -862,20 +787,10 @@ class CookingBot:
             logger.error(f"处理菜单和cook按钮状态时出错: {e}")
             if not self.handle_timeout():
                 raise Exception("菜单和cook按钮检测状态处理超时")
-    
-    def get_active_window_title(self):
-        """获取当前活动窗口的标题"""
-        try:
-            hwnd = win32gui.GetForegroundWindow()
-            return win32gui.GetWindowText(hwnd)
-        except Exception as e:
-            logger.error(f"获取活动窗口标题失败: {e}")
-            return None
 
     def handle_food_state(self):
         """处理食物和start按钮检测状态"""
         try:
-            
             # 2. 检测食物按钮
             if not self.food_clicked:
                 food_buttons = self.detect_food()
@@ -918,7 +833,7 @@ class CookingBot:
                     center_y = int(y + h // 2)
                     self.mouse_click(center_x, center_y, double_click=False)
                     logger.info(f"点击start按钮 位置: ({center_x}, {center_y})")
-                    time.sleep(0.5)
+                    time.sleep(0.7)
                     
                     # 验证点击是否成功
                     verify_buttons = self.detect_buttons('cook_start', threshold=0.5)
@@ -947,56 +862,37 @@ class CookingBot:
                             time.sleep(0.5)
                 except Exception as e:
                     logger.error(f"点击start按钮失败: {e}")
-            
+            else:
+                self.change_state(CookingState.DETECT_MENU_AND_COOK)
             
             # 如果长时间未找到按钮，返回菜单检测状态
             if self.is_state_timeout():
                 logger.warning("长时间未找到食物或start按钮，返回菜单检测状态")
                 self.change_state(CookingState.DETECT_MENU_AND_COOK)
                 return
-            
-            # 等待一段时间后继续检测
-            time.sleep(0.5)
                 
         except Exception as e:
             logger.error(f"处理食物和start按钮状态时出错: {e}")
             if not self.handle_timeout():
                 raise Exception("食物和start按钮检测状态处理超时")
 
-
     def handle_finish_state(self):
         """处理finish按钮检测和点击状态"""
         try:
-            
             logger.info(f"=== 开始依次点击 {len(self.finish_button_positions)} 个finish按钮 ===")
             for i, finish_button in enumerate(self.finish_button_positions):
-                # 每次点击前检查cook按钮
-                cook_buttons = self.detect_buttons('cook', threshold=0.6)
-                if cook_buttons and len(cook_buttons) > 0:
-                    logger.info("=== 点击finish前检测到cook按钮，优先处理 ===")
-                    cook_button = cook_buttons[0].tolist() if isinstance(cook_buttons[0], np.ndarray) else list(
-                        cook_buttons[0])
-                    x, y, w, h, conf = cook_button
-                    center_x = int(x + w // 2)
-                    center_y = int(y + h // 2)
-                    self.mouse_click(center_x, center_y, double_click=False)
-                    logger.info(f"点击cook按钮 位置: ({center_x}, {center_y})")
-                    self.cook_clicks += 1
-                    self.change_state(CookingState.DETECT_MENU_AND_COOK)
-                    return
-                
                 # 点击当前finish按钮
                 button_data = finish_button.tolist() if isinstance(finish_button, np.ndarray) else list(finish_button)
                 x, y, w, h, conf = button_data
                 center_x = int(x + w // 2)
                 center_y = int(y + h // 2)
 
-                logger.info(f"点击finish按钮 {i+1}/3 位置: ({center_x}, {center_y}), 置信度: {conf:.2f}")
+                logger.info(f"点击finish按钮 {i+1}/3 位置: ({center_x}, {center_y})")
                 self.mouse_click(center_x, center_y, double_click=False)
-                time.sleep(0.5)  # 点击后短暂等待
+                time.sleep(0.6)  # 点击后短暂等待
                 self.finish_clicks += 1
             
-            # 4. 验证是否成功点击了所有finish按钮
+            # 验证是否成功点击了所有finish按钮
             finish_buttons = self.detect_buttons('finish')
             if not finish_buttons or len(finish_buttons) == 0:
                 logger.info("=== 成功点击了所有finish按钮（按钮数量减少） ===")
@@ -1022,7 +918,6 @@ class CookingBot:
             logger.error(f"处理finish按钮状态时出错: {e}")
             # 发生错误时返回菜单检测状态
             self.change_state(CookingState.DETECT_MENU_AND_COOK)
-
 
     def reset_state(self):
         """重置状态以开始新的循环"""
@@ -1059,12 +954,9 @@ class CookingBot:
         else:
             logger.info("=== 尚未找到菜单按钮位置，需要重新旋转寻找 ===")
 
-
     def run(self):
         """运行烹饪机器人"""
         try:
-            # 确保在开始主循环前窗口处于激活状态
-            # self.find_and_activate_game_window()
             logger.info("开始自动烹饪流程...")
             logger.info("使用窗口截图模式，只截取心动小镇窗口区域")
             
@@ -1258,51 +1150,10 @@ class CookingBot:
         except Exception as e:
             logger.error(f"保存调试图像失败: {e}")
 
-    def mouse_click(self, x, y, double_click=False, delay=0.1):
-        """使用mouseDown和mouseUp模拟点击
-        
-        Args:
-            x: 鼠标x坐标
-            y: 鼠标y坐标
-            double_click: 是否双击
-            delay: 按下和释放之间的延迟
-        """
-        try:
-            
-            # 第一次点击
-            pyautogui.mouseDown(x=x, y=y, button='left')
-            # 更新鼠标状态为按下
-            self.overlay.update_mouse_state((x, y), True)
-            time.sleep(delay)  # 按下后稍等片刻
-            pyautogui.mouseUp(x=x, y=y, button='left')
-            # 更新鼠标状态为释放
-            
-            # 如果是双击，再点击一次
-            if double_click:
-                time.sleep(0.05)  # 两次点击之间短暂停顿
-                pyautogui.mouseDown(x=x, y=y, button='left')
-                # 更新鼠标状态为按下
-                self.overlay.update_mouse_state((x, y), True)
-                time.sleep(delay)  # 按下后稍等片刻
-                pyautogui.mouseUp(x=x, y=y, button='left')
-                # 更新鼠标状态为释放
-            
-            logger.debug(f"模拟点击: ({x}, {y}), 双击: {double_click}")
-            
-        except Exception as e:
-            logger.error(f"模拟点击失败: {e}")
-            # 确保鼠标按键被释放
-            try:
-                pyautogui.mouseUp(button='left')
-                # 更新鼠标状态为释放
-                self.overlay.update_mouse_state((x, y), False)
-            except:
-                pass
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='自动烹饪机器人')
-    parser.add_argument('--food', type=str, default='葡萄酱', help='食物名称')
+    parser.add_argument('--food', type=str, default='烤草莓棉花糖', help='食物名称')
     parser.add_argument('--loop', type=int, default=-1, help='循环次数，-1表示无限循环')
 
     args = parser.parse_args()
@@ -1313,5 +1164,7 @@ if __name__ == "__main__":
         available_foods = bot.get_available_foods()
         logger.info(f"可用的食物模板: {available_foods}")
         bot.run()
+             # 查找并激活心动小镇窗口
+        bot.find_and_activate_game_window()
     except Exception as e:
         logger.error(f"程序运行失败: {e}")
