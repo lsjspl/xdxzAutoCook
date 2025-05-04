@@ -14,9 +14,8 @@ import argparse
 import win32gui
 import win32con
 import win32com.client
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget
-from PyQt5.QtCore import Qt, QPoint, QTimer
-from PyQt5.QtGui import QPainter, QColor, QPen, QFont
+import tkinter as tk
+from PIL import Image, ImageTk
 
 # 配置日志
 logging.basicConfig(
@@ -39,90 +38,71 @@ class CookingState(Enum):
     DETECT_FINISH = auto()  # 检测Finish按钮
 
 
-class OverlayWindow(QMainWindow):
+class OverlayWindow:
     def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Overlay")
-        # 设置窗口标志
-        self.setWindowFlags(
-            Qt.FramelessWindowHint |  # 无边框
-            Qt.WindowStaysOnTopHint |  # 置顶
-            Qt.Tool |  # 工具窗口
-            Qt.X11BypassWindowManagerHint  # 绕过窗口管理器
-        )
-        # 设置窗口属性
-        self.setAttribute(Qt.WA_TranslucentBackground)  # 透明背景
-        self.setAttribute(Qt.WA_NoSystemBackground)  # 无系统背景
-        self.setAttribute(Qt.WA_TransparentForMouseEvents)  # 鼠标事件穿透
+        self.root = tk.Tk()
+        self.root.title("Overlay")
+        self.root.attributes('-topmost', True)  # 置顶
+        self.root.attributes('-alpha', 0.8)  # 设置透明度
+        self.root.attributes('-transparentcolor', 'white')  # 设置透明色
+        self.root.overrideredirect(True)  # 无边框
         
-        # 创建中央部件
-        self.central_widget = QWidget()
-        self.setCentralWidget(self.central_widget)
+        # 获取屏幕尺寸
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
         
-        # 设置窗口为全屏
-        screen = QApplication.primaryScreen().geometry()
-        self.setGeometry(screen)
+        # 设置窗口大小和位置
+        self.root.geometry(f"{screen_width}x{screen_height}+0+0")
+        
+        # 创建画布
+        self.canvas = tk.Canvas(self.root, width=screen_width, height=screen_height, 
+                              highlightthickness=0, bg='white')
+        self.canvas.pack(fill=tk.BOTH, expand=True)
         
         self.matches = []
         self.button_name = None
         
-        # 设置定时器用于更新显示，使用更快的刷新率
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update)
-        self.timer.start(8)  # 约120fps
-        
-        # 设置窗口透明度
-        self.setWindowOpacity(0.8)
+        # 设置定时器用于更新显示
+        self.update_interval = 8  # 约120fps
+        self.root.after(self.update_interval, self.update)
         
     def update_overlay(self, matches, button_name=None):
         """更新覆盖层显示"""
         self.matches = matches
         self.button_name = button_name
-        self.update()
         
-    def paintEvent(self, event):
-        """绘制事件处理"""
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+    def update(self):
+        """更新画布显示"""
+        self.canvas.delete("all")
         
-        # 清除之前的绘制
-        painter.setCompositionMode(QPainter.CompositionMode_Clear)
-        painter.fillRect(self.rect(), Qt.transparent)
-        painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
-        
-        # 绘制匹配的矩形框
         for match in self.matches:
-            # 将numpy.float64转换为整数
-            x = int(match[0])
-            y = int(match[1])
-            w = int(match[2])
-            h = int(match[3])
-            conf = float(match[4])
-            
+            x, y, w, h, conf = match
             # 绘制绿色矩形框
-            pen = QPen(QColor(0, 255, 0))
-            pen.setWidth(2)  # 进一步减小线条宽度
-            painter.setPen(pen)
-            painter.drawRect(x, y, w, h)
+            self.canvas.create_rectangle(x, y, x + w, y + h, 
+                                      outline='green', width=2)
             
             # 显示按钮名称和置信度
             display_text = f'{conf:.2f}'
             if self.button_name:
                 display_text = f'{self.button_name}: {display_text}'
-                
-            font = QFont()
-            font.setBold(True)
-            font.setPointSize(10)  # 进一步减小字体大小
-            painter.setFont(font)
-            painter.setPen(QColor(0, 255, 0))
-            painter.drawText(x, y - 3, display_text)  # 进一步减小文本偏移
             
-                    
-    def closeEvent(self, event):
-        """窗口关闭事件处理"""
-        self.timer.stop()
-        event.accept()
+            self.canvas.create_text(x, y - 3, text=display_text,
+                                  fill='green', anchor='sw',
+                                  font=('Arial', 10, 'bold'))
+        
+        self.root.after(self.update_interval, self.update)
+        
+    def show(self):
+        """显示窗口"""
+        self.root.deiconify()
+        
+    def close(self):
+        """关闭窗口"""
+        self.root.destroy()
+        
+    def run(self):
+        """运行主循环"""
+        self.root.mainloop()
 
 
 class CookingBot:
@@ -132,8 +112,9 @@ class CookingBot:
         :param food_name: 食物模板的名称（不包含.png后缀）
         :param loop_count: 循环执行次数，-1表示无限循环
         """
-        # 创建QApplication实例
-        self.app = QApplication(sys.argv)
+        # 创建Tkinter实例
+        self.app = tk.Tk()
+        self.app.withdraw()  # 隐藏主窗口
         
         # 初始化游戏窗口句柄和位置
         self.game_hwnd = None
@@ -170,16 +151,10 @@ class CookingBot:
             'back': ['back.png'],
         }
 
-        # 分别存储普通模板和食物模板
-        self.templates = self.load_templates()
-        self.food_templates = self.load_food_templates()
-
         # 创建并显示遮罩窗口
         self.overlay = OverlayWindow()
         self.overlay.show()
         
-   
-
         keyboard.add_hotkey('ctrl+q', self.stop)
         logger.info(f"当前选择的食物: {food_name}")
         logger.info("按 Ctrl+Q 可以退出程序")
@@ -741,7 +716,7 @@ class CookingBot:
                 except Exception as e:
                     logger.error(f"点击cook按钮失败: {e}")
             
-            # 2. 检测finish按钮数量，如果有3个就进入finish状态
+            # 2. 检测finish按钮数量，如果有3个就进入finish处理状态
             finish_buttons = self.detect_buttons('finish')
             if finish_buttons and len(finish_buttons) >= 3:
                 logger.info(f"=== 检测到 {len(finish_buttons)} 个finish按钮，进入finish处理状态 ===")
@@ -957,6 +932,10 @@ class CookingBot:
     def run(self):
         """运行烹饪机器人"""
         try:
+            # 分别存储普通模板和食物模板
+            self.templates = self.load_templates()
+            self.food_templates = self.load_food_templates()
+
             logger.info("开始自动烹饪流程...")
             logger.info("使用窗口截图模式，只截取心动小镇窗口区域")
             
@@ -1008,8 +987,8 @@ class CookingBot:
                     else:
                         raise
 
-                # 处理Qt事件
-                self.app.processEvents()
+                # 处理Tkinter事件
+                self.app.update()
                 time.sleep(0.1)  # 主循环间隔
 
         except KeyboardInterrupt:
@@ -1019,6 +998,7 @@ class CookingBot:
         finally:
             self.executor.shutdown()
             self.overlay.close()
+            self.app.destroy()
             logger.info("程序已退出")
 
 
