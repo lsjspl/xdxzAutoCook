@@ -1153,7 +1153,7 @@ class CookingBot:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='自动烹饪机器人')
-    parser.add_argument('--food', type=str, default='烤草莓棉花糖', help='食物名称')
+    parser.add_argument('--food', type=str, default='饱藏泡芙蛋糕卷', help='食物名称')
     parser.add_argument('--loop', type=int, default=-1, help='循环次数，-1表示无限循环')
 
     args = parser.parse_args()
