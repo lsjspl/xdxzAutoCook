@@ -1,0 +1,46 @@
+{
+    "鲸鱼16": {
+        "name": "鲸鱼16",
+        "reference_image_path": "C:\\Users\\lsj\\Desktop\\IDEAProject\\xdxzAutoCook\\pintu\\configs\\images\\鲸鱼16.png",
+        "mapping_area": {
+            "x": 1376,
+            "y": 203,
+            "width": 549,
+            "height": 545
+        },
+        "block_count": 16
+    },
+    "渔村": {
+        "name": "渔村",
+        "reference_image_path": "C:\\Users\\lsj\\Desktop\\IDEAProject\\xdxzAutoCook\\pintu\\configs\\images\\渔村.png",
+        "mapping_area": {
+            "x": 1378,
+            "y": 205,
+            "width": 548,
+            "height": 545
+        },
+        "block_count": 36
+    },
+    "小鹿": {
+        "name": "小鹿",
+        "reference_image_path": "C:\\Users\\lsj\\Desktop\\IDEAProject\\xdxzAutoCook\\pintu\\configs\\images\\小鹿.png",
+        "mapping_area": {
+            "x": 1379,
+            "y": 206,
+            "width": 546,
+            "height": 545
+        },
+        "block_count": 36
+    },
+    "吊桥100": {
+        "name": "吊桥100",
+        "reference_image_path": "C:\\Users\\lsj\\Desktop\\IDEAProject\\xdxzAutoCook\\pintu\\configs\\images\\吊桥100.png",
+        "mapping_area": {
+            "x": 1374,
+            "y": 200,
+            "width": 548,
+            "height": 550
+        },
+        "block_count": 100
+    }
+} 

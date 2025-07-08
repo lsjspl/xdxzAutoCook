@@ -496,7 +496,7 @@ class CookingBot:
                 threshold = 0.5
             else:
                 self.scale_factors = np.arange(0.8, 1.2, 0.1)
-                threshold = 0.6
+                threshold = 0.55
 
             if template_name == 'food':
                 return self.detect_food()
@@ -659,6 +659,12 @@ class CookingBot:
         self.state = new_state
         self.reset_state_timer()
 
+    def mouse_click_button(self, button, double_click=False, delay=0.1):
+        x, y, w, h = button
+        center_x = int(x + w // 2)
+        center_y = int(y + h // 2)
+        self.mouse_click(self, center_x, center_y, double_click, delay)
+        
     def mouse_click(self, x, y, double_click=False, delay=0.1):
         """使用mouseDown和mouseUp模拟点击
         
@@ -701,12 +707,8 @@ class CookingBot:
                 try:
                     cook_button = cook_buttons[0].tolist() if isinstance(cook_buttons[0], np.ndarray) else list(
                         cook_buttons[0])
-                    x, y, w, h, conf = cook_button
-                    
-                    # 点击cook按钮
-                    center_x = int(x + w // 2)
-                    center_y = int(y + h // 2)
-                    self.mouse_click(center_x, center_y, double_click=False)
+
+                    self.mouse_click(cook_button, double_click=False)
                     logger.info(f"点击cook按钮 位置: ({center_x}, {center_y})")
                     self.cook_clicks += 1
                     

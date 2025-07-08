@@ -729,7 +729,7 @@ class PianoApp:
 
 if __name__ == "__main__":
     # 隐藏控制台窗口
-    hide_console()
+    # hide_console()
     root = tk.Tk()
     app = PianoApp(root)
     root.mainloop()
