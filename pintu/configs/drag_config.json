@@ -1,0 +1,18 @@
+{
+    "window_title": "心动小镇",
+    "wiggle_count": 2,
+    "wiggle_range": 2,
+    "wiggle_delay": 0.05,
+    "move_delay": 0.15,
+    "press_delay": 0.25,
+    "min_steps": 10,
+    "max_steps": 15,
+    "min_step_delay": 0.008,
+    "max_step_delay": 0.015,
+    "final_delay": 0.1,
+    "cooldown_time": 100,
+    "noise_range": 1,
+    "mid_drag_wait": true,
+    "mid_drag_wait_time": 2.0,
+    "mid_drag_wait_ratio": 0.5
+}

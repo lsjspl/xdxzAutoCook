@@ -10,17 +10,6 @@
         },
         "block_count": 16
     },
-    "渔村": {
-        "name": "渔村",
-        "reference_image_path": "C:\\Users\\lsj\\Desktop\\IDEAProject\\xdxzAutoCook\\pintu\\configs\\images\\渔村.png",
-        "mapping_area": {
-            "x": 1378,
-            "y": 205,
-            "width": 548,
-            "height": 545
-        },
-        "block_count": 36
-    },
     "小鹿": {
         "name": "小鹿",
         "reference_image_path": "C:\\Users\\lsj\\Desktop\\IDEAProject\\xdxzAutoCook\\pintu\\configs\\images\\小鹿.png",
@@ -37,10 +26,123 @@
         "reference_image_path": "C:\\Users\\lsj\\Desktop\\IDEAProject\\xdxzAutoCook\\pintu\\configs\\images\\吊桥100.png",
         "mapping_area": {
             "x": 1374,
-            "y": 200,
-            "width": 548,
-            "height": 550
+            "y": 203,
+            "width": 549,
+            "height": 546
+        },
+        "puzzle_region": [
+            1165,
+            880,
+            54,
+            53
+        ],
+        "block_count": 100,
+        "show_arrow": true
+    },
+    "花田狐狸100": {
+        "name": "花田狐狸100",
+        "reference_image_path": "C:\\Users\\lsj\\Desktop\\IDEAProject\\xdxzAutoCook\\pintu\\configs\\images\\花田狐狸100.png",
+        "mapping_area": {
+            "x": 1357,
+            "y": 237,
+            "width": 546,
+            "height": 545
         },
         "block_count": 100
+    },
+    "动物全家福36": {
+        "name": "动物全家福36",
+        "reference_image_path": "C:\\Users\\lsj\\Desktop\\IDEAProject\\xdxzAutoCook\\pintu\\configs\\images\\动物全家福36.png",
+        "mapping_area": {
+            "x": 1332,
+            "y": 211,
+            "width": 546,
+            "height": 545
+        },
+        "block_count": 36
+    },
+    "帐篷64": {
+        "name": "帐篷64",
+        "reference_image_path": "C:\\Users\\lsj\\Desktop\\IDEAProject\\xdxzAutoCook\\pintu\\configs\\images\\帐篷64.png",
+        "mapping_area": {
+            "x": 1333,
+            "y": 208,
+            "width": 548,
+            "height": 548
+        },
+        "block_count": 64
+    },
+    "渔村100": {
+        "name": "渔村100",
+        "reference_image_path": "C:\\Users\\lsj\\Desktop\\IDEAProject\\xdxzAutoCook\\pintu\\configs\\images\\渔村100.png",
+        "mapping_area": {
+            "x": 1334,
+            "y": 211,
+            "width": 548,
+            "height": 545
+        },
+        "block_count": 100
+    },
+    "花园街100": {
+        "name": "花园街100",
+        "reference_image_path": "C:\\Users\\lsj\\Desktop\\IDEAProject\\xdxzAutoCook\\pintu\\configs\\images\\花园街100.png",
+        "mapping_area": {
+            "x": 1329,
+            "y": 212,
+            "width": 549,
+            "height": 546
+        },
+        "block_count": 100
+    },
+    "喷泉36": {
+        "name": "喷泉36",
+        "reference_image_path": "C:\\Users\\lsj\\Desktop\\IDEAProject\\xdxzAutoCook\\pintu\\configs\\images\\喷泉36.png",
+        "mapping_area": {
+            "x": 1330,
+            "y": 213,
+            "width": 547,
+            "height": 545
+        },
+        "block_count": 36
+    },
+    "渔村36": {
+        "name": "渔村36",
+        "reference_image_path": "C:\\Users\\lsj\\Desktop\\IDEAProject\\xdxzAutoCook\\pintu\\configs\\images\\渔村36.png",
+        "mapping_area": {
+            "x": 1334,
+            "y": 211,
+            "width": 548,
+            "height": 545
+        },
+        "block_count": 36
+    },
+    "心门64": {
+        "name": "心门64",
+        "reference_image_path": "C:\\Users\\lsj\\Desktop\\IDEAProject\\xdxzAutoCook\\pintu\\configs\\images\\心门64.png",
+        "mapping_area": {
+            "x": 1197,
+            "y": 195,
+            "width": 545,
+            "height": 549
+        },
+        "block_count": 64
+    },
+    "3只老鼠100": {
+        "name": "3只老鼠100",
+        "reference_image_path": "C:\\Users\\lsj\\Desktop\\IDEAProject\\xdxzAutoCook\\pintu\\configs\\images\\3只老鼠100.png",
+        "mapping_area": {
+            "x": 1374,
+            "y": 203,
+            "width": 549,
+            "height": 546
+        },
+        "puzzle_region": [
+            1168,
+            878,
+            55,
+            57
+        ],
+        "block_count": 100,
+        "show_arrow": true
     }
-} 
+}

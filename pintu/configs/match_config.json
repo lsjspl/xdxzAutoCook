@@ -1,0 +1,16 @@
+{
+    "search_margin_100": 20,
+    "search_margin_other": 10,
+    "gray_weight_100": 0.4,
+    "hist_weight_100": 0.3,
+    "edge_weight_100": 0.2,
+    "gray_weight_other": 0.5,
+    "hist_weight_other": 0.3,
+    "edge_weight_other": 0.15,
+    "canny_low": 50,
+    "canny_high": 150,
+    "hist_bins": 8,
+    "position_bonus_weight": 0.1,
+    "confidence_threshold": 0.6,
+    "edge_match_weight": 0.5
+}

@@ -217,3 +217,6 @@ python pintu.py
 3. **处理特殊情况**：
    - 如果图块有旋转，可能需要手动调整
    - 对于颜色相似的图块，注意查看置信度 
+
+
+   pyinstaller --noconsole --onefile pintu/PuzzleApp.py
