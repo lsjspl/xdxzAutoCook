@@ -12,7 +12,7 @@
     "final_delay": 0.1,
     "cooldown_time": 100,
     "noise_range": 1,
-    "mid_drag_wait": true,
+    "mid_drag_wait": false,
     "mid_drag_wait_time": 2.0,
     "mid_drag_wait_ratio": 0.5
 }

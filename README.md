@@ -219,4 +219,6 @@ python pintu.py
    - 对于颜色相似的图块，注意查看置信度 
 
 
-   pyinstaller --noconsole --onefile pintu/PuzzleApp.py
+```bash
+   pyinstaller PuzzleApp.spec
+ ```

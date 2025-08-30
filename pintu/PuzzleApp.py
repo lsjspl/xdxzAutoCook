@@ -1566,28 +1566,33 @@ class PuzzleApp(QWidget):
             QMessageBox.critical(self, "错误", "请先截图完整图")
             return
             
-        ref_height, ref_width = self.reference_img.shape[:2]
-        self.status_bar.setText("请选择映射区域...")
-        self.cropper = crop_interactive_region(
-            self.on_mapping_area_selected, 
-            initial_size=(ref_width, ref_height)
-        )
+        self.status_bar.setText("请拖拽选择映射区域...")
+        self.cropper = crop_screen_region(self.on_mapping_area_selected, return_position=True)
         
     def on_mapping_area_selected(self, img, position):
         if img and img.size[0] > 0 and img.size[1] > 0:
             try:
                 ref_height, ref_width = self.reference_img.shape[:2]
+                # 保存截图区域的坐标信息
+                if position:
+                    x, y = position
+                    width, height = img.size
+                else:
+                    # 如果无法获取坐标，使用默认值
+                    x, y = 0, 0
+                    width, height = img.size
+                
                 self.mapping_area = {
-                    'img': img, 'width': img.size[0], 'height': img.size[1],
+                    'img': img, 'width': width, 'height': height,
                     'ref_width': ref_width, 'ref_height': ref_height,
-                    'x': position[0] if position else 0, 'y': position[1] if position else 0
+                    'x': x, 'y': y
                 }
                 
                 if self.mapping_overlay:
                     self.mapping_overlay.close()
                 
                 self.mapping_overlay = create_mapping_overlay(
-                    position[0], position[1], img.size[0], img.size[1],
+                    x, y, width, height,
                     int(self.block_combo.currentText())
                 )
                 self.mapping_overlay.closed.connect(self.on_overlay_closed)
@@ -1599,7 +1604,7 @@ class PuzzleApp(QWidget):
                 self.btn_select_mapping.setText("③ 映射区已设置")
                 self.btn_select_mapping.setStyleSheet("background-color: lightgreen;")
                 
-                self.status_bar.setText(f"✅ 映射区域已选择: {img.size[0]}×{img.size[1]}")
+                self.status_bar.setText(f"✅ 映射区域已选择: {width}×{height}")
                 self.status_bar.setStyleSheet("color: green;")
             except Exception as e:
                 self.status_bar.setText(f"❌ 选择映射区域失败: {str(e)}")

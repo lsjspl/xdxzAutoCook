@@ -1,0 +1,55 @@
+{
+  "bag_button_pos": [
+    2367,
+    213,
+    48,
+    56
+  ],
+  "fish_button_pos": [
+    2215,
+    696,
+    97,
+    118
+  ],
+  "fish_tail_button_pos": [
+    2067,
+    240,
+    76,
+    107
+  ],
+  "perfume_button_pos": [
+    1805,
+    251,
+    72,
+    91
+  ],
+  "spray_button_pos": [
+    1558,
+    279,
+    76,
+    52
+  ],
+  "use_button_pos": [
+    1811,
+    297,
+    94,
+    55
+  ],
+  "fish_tail_interval": 60,
+  "perfume_interval": 120,
+  "game_window_pos": [
+    881,
+    35
+  ],
+  "game_window_size": [
+    1616,
+    939
+  ],
+  "click_wait_time": 2.0,
+  "retry_wait_time": 2.0,
+  "button_check_interval": 0.5,
+  "auto_fish_tail_enabled": true,
+  "auto_click_enabled": true,
+  "always_on_top_enabled": true,
+  "show_game_window_enabled": true
+}

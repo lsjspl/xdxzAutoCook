@@ -7,7 +7,7 @@ a = Analysis(
     binaries=[],
     datas=[
         ('common', 'common'),  # 包含common模块
-        ('pintu/configs', 'configs'),  # 包含配置文件目录
+#        ('pintu/configs', 'configs'),  # 包含配置文件目录
     ],
     hiddenimports=[
         'common.isAdmin',  # 明确包含common.isAdmin模块
