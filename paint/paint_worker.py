@@ -6,11 +6,8 @@
 
 import logging
 import time
-import threading
-import ctypes
-import random
-from ctypes import wintypes, Structure, c_long, c_ulong, byref
 from PyQt5.QtCore import QThread, pyqtSignal
+from click_utils import click_position
 
 try:
     import keyboard
@@ -19,31 +16,7 @@ except ImportError:
     HOTKEY_ENABLED = False
     logging.warning("keyboard 未安装，热键功能将被禁用")
 
-# Windows API 结构体定义
-class POINT(Structure):
-    _fields_ = [("x", c_long), ("y", c_long)]
 
-class MOUSEINPUT(Structure):
-    _fields_ = [("dx", c_long),
-               ("dy", c_long),
-               ("mouseData", wintypes.DWORD),
-               ("dwFlags", wintypes.DWORD),
-               ("time", wintypes.DWORD),
-               ("dwExtraInfo", ctypes.POINTER(wintypes.ULONG))]
-
-class INPUT(Structure):
-    class _INPUT(ctypes.Union):
-        _fields_ = [("mi", MOUSEINPUT)]
-    _anonymous_ = ("_input",)
-    _fields_ = [("type", wintypes.DWORD),
-               ("_input", _INPUT)]
-
-# Windows API 常量
-INPUT_MOUSE = 0
-MOUSEEVENTF_MOVE = 0x0001
-MOUSEEVENTF_LEFTDOWN = 0x0002
-MOUSEEVENTF_LEFTUP = 0x0004
-MOUSEEVENTF_ABSOLUTE = 0x8000
 
 
 class DrawingWorker(QThread):
@@ -55,12 +28,81 @@ class DrawingWorker(QThread):
     drawing_completed = pyqtSignal()  # 绘图完成
     drawing_error = pyqtSignal(str)  # 绘图错误
     
-    def __init__(self, pixel_info_list, color_palette, color_area_pos):
+    def __init__(self, pixel_info_list, collected_colors, draw_area_pos, palette_button_pos=None, return_button_pos=None):
         super().__init__()
         
         self.pixel_info_list = pixel_info_list
-        self.color_palette = color_palette
-        self.color_area_pos = color_area_pos
+        self.collected_colors = collected_colors
+        self.draw_area_pos = draw_area_pos
+        self.palette_button_pos = palette_button_pos
+        self.return_button_pos = return_button_pos
+        
+        # 重要：只使用子级颜色，过滤掉父级颜色
+        child_colors = [color_info for color_info in collected_colors if not color_info.get('is_parent', False)]
+        
+        # 从收集的颜色中提取调色板（只包含子颜色）
+        self.color_palette = [color_info['rgb'] for color_info in child_colors] if child_colors else []
+        
+        # 记录调试信息
+        if child_colors:
+            logging.info(f"绘图工作线程初始化：共{len(child_colors)}种子级颜色")
+            # 检查子颜色的父颜色索引
+            parent_indices = set()
+            for color_info in child_colors:
+                parent_idx = color_info.get('parent_index')
+                if parent_idx is not None:
+                    parent_indices.add(parent_idx)
+                else:
+                    logging.warning(f"子颜色 RGB{color_info['rgb']} 缺少父颜色索引")
+            
+            logging.info(f"子颜色使用的父颜色索引: {sorted(parent_indices)}")
+        else:
+            logging.warning("绘图工作线程初始化：没有收集到子级颜色")
+        
+        # 检查父颜色信息
+        parent_colors = [color_info for color_info in collected_colors if color_info.get('is_parent', False)]
+        if parent_colors:
+            logging.info(f"可用父颜色数量: {len(parent_colors)}")
+            for i, parent_color in enumerate(parent_colors):
+                logging.debug(f"父颜色{i}: RGB{parent_color['rgb']}, 索引: {parent_color.get('parent_index')}")
+        else:
+            logging.warning("没有找到父颜色信息")
+        
+        # 添加详细的调试信息
+        logging.info(f"=== DrawingWorker 初始化调试信息 ===")
+        logging.info(f"总颜色数量: {len(collected_colors)}")
+        
+        # 统计父颜色和子颜色
+        parent_count = len([c for c in collected_colors if c.get('is_parent', False)])
+        child_count = len([c for c in collected_colors if not c.get('is_parent', False)])
+        logging.info(f"父颜色数量: {parent_count}, 子颜色数量: {child_count}")
+        
+        # 显示前几个颜色的详细信息
+        for i, color in enumerate(collected_colors[:5]):
+            color_type = "父颜色" if color.get('is_parent', False) else "子颜色"
+            parent_idx = color.get('parent_index', '无')
+            parent_name = color.get('parent', '无')
+            logging.info(f"颜色{i}: {color_type}, RGB{color['rgb']}, 父索引: {parent_idx}, 父名称: {parent_name}")
+        
+        # 检查子颜色的父索引分布
+        if child_count > 0:
+            parent_indices = [c.get('parent_index') for c in collected_colors if not c.get('is_parent', False) and c.get('parent_index') is not None]
+            if parent_indices:
+                logging.info(f"子颜色使用的父索引: {sorted(set(parent_indices))}")
+                logging.info(f"父索引范围: {min(parent_indices)} - {max(parent_indices)}")
+        
+        logging.info(f"=== 调试信息结束 ===")
+        
+        # 记录按钮位置信息
+        if palette_button_pos:
+            logging.info(f"色盘按钮位置: {palette_button_pos}")
+        else:
+            logging.warning("色盘按钮位置未设置")
+            
+        if return_button_pos:
+            logging.info(f"返回按钮位置: {return_button_pos}")
+        else:
+            logging.warning("返回按钮位置未设置")
         
         self.is_running = False
         self.should_stop = False
@@ -68,9 +110,7 @@ class DrawingWorker(QThread):
         # 点击延迟设置
         self.color_click_delay = 0.5  # 点击颜色后的延迟（保持不变避免反应不过来）
         self.draw_click_delay = 0.01  # 点击绘图位置后的延迟（减少延迟提高速度）
-        self.mouse_move_delay = 0.005  # 鼠标移动延迟（减少延迟提高速度）
-        
-
+        self.mouse_move_delay = 0.005
         
         logging.info("绘图工作线程初始化完成")
     
@@ -92,7 +132,7 @@ class DrawingWorker(QThread):
             
             processed_pixels = 0
             
-            for group_index, (color_idx, (color_position, pixel_positions)) in enumerate(color_groups.items()):
+            for group_index, (color_idx, (color_info, pixel_positions)) in enumerate(color_groups.items()):
                 # 检查是否需要停止
                 if self.should_stop:
                     self.status_updated.emit("绘图已被用户停止")
@@ -102,18 +142,12 @@ class DrawingWorker(QThread):
                 self.status_updated.emit(f"开始绘制颜色 {group_index + 1}/{total_colors}（颜色索引{color_idx}），共{pixels_in_group}个像素点")
                 logging.info(f"开始绘制颜色 {group_index + 1}/{total_colors}（颜色索引{color_idx}），共{pixels_in_group}个像素点")
                 
-                # 点击颜色
-                success = self._click_position(color_position)
+                # 实现正确的游戏操作流程
+                success = self._select_color_for_drawing(color_info)
                 if not success:
-                    logging.warning(f"点击颜色位置{color_position}失败，跳过该颜色")
+                    logging.warning(f"选择颜色失败，跳过该颜色: RGB{color_info.get('rgb', 'Unknown')}")
                     processed_pixels += pixels_in_group
                     continue
-                
-                # 在延迟期间检查停止标志
-                self._interruptible_sleep(self.color_click_delay)
-                if self.should_stop:
-                    self.status_updated.emit("绘图已被用户停止")
-                    break
                 
                 # 绘制该颜色的所有像素点
                 for i, position in enumerate(pixel_positions):
@@ -123,7 +157,7 @@ class DrawingWorker(QThread):
                         break
                     
                     # 点击绘图位置
-                    success = self._click_position(position)
+                    success = click_position(position)
                     if not success:
                         logging.warning(f"点击绘图位置{position}失败")
                         continue
@@ -145,8 +179,9 @@ class DrawingWorker(QThread):
                         self.status_updated.emit(f"绘图进度: {processed_pixels}/{total_pixels} ({progress_percent:.1f}%)")
                         logging.info(f"绘图进度: {processed_pixels}/{total_pixels} ({progress_percent:.1f}%)")
                 
-                # 完成当前颜色的绘制
+                # 完成当前颜色的绘制后，返回到父颜色区域
                 if not self.should_stop:
+                    self._return_to_parent_colors()
                     color_progress_percent = (group_index + 1) / total_colors * 100
                     self.status_updated.emit(f"颜色 {group_index + 1}/{total_colors}（颜色索引{color_idx}） 绘制完成 ({color_progress_percent:.1f}%)")
                     logging.info(f"颜色 {group_index + 1}/{total_colors}（颜色索引{color_idx}） 绘制完成")
@@ -178,25 +213,27 @@ class DrawingWorker(QThread):
             position = pixel_info['position']
             target_color = pixel_info['color']
             
-            # 找到最接近的颜色在调色板中的索引
-            color_index = self._find_closest_color_index(target_color)
+            # 直接通过RGB值获取颜色信息，避免索引错位
+            color_info = self._get_color_info_by_rgb(target_color)
             
-            # 计算颜色在颜色区域中的位置
-            color_position = self._get_color_position(color_index)
-            
-            if color_position:
-                # 使用颜色索引作为分组键
-                if color_index not in color_groups:
-                    color_groups[color_index] = (color_position, [])
+            if color_info:
+                # 使用RGB值作为分组键，确保唯一性
+                rgb_key = str(color_info['rgb'])
+                if rgb_key not in color_groups:
+                    color_groups[rgb_key] = (color_info, [])
                 
                 # 将像素位置添加到对应颜色组
-                color_groups[color_index][1].append(position)
+                color_groups[rgb_key][1].append(position)
             else:
-                logging.warning(f"无法获取颜色{color_index}的位置，跳过像素{position}")
+                logging.warning(f"无法获取颜色RGB{target_color}的信息，跳过像素{position}")
         
         logging.info(f"颜色分组完成，共{len(color_groups)}种颜色")
-        for color_idx, (color_pos, positions) in color_groups.items():
-            logging.info(f"颜色{color_idx}: {len(positions)}个像素点")
+        for rgb_key, (color_info, positions) in color_groups.items():
+            # 获取颜色信息用于调试
+            color_type = "父级颜色" if color_info.get('is_parent', False) else "子级颜色"
+            parent_info = color_info.get('parent', '未知父颜色')
+            parent_idx = color_info.get('parent_index', '无')
+            logging.info(f"颜色RGB{rgb_key}({color_type}): RGB{color_info['rgb']}, 父颜色: {parent_info}, 父索引: {parent_idx}, {len(positions)}个像素点")
         
         return color_groups
     
@@ -237,156 +274,179 @@ class DrawingWorker(QThread):
             logging.error(f"查找最接近颜色失败: {e}")
             return 0
     
-    def _get_color_position(self, color_index):
-        """获取颜色在颜色区域中的位置"""
+    def _get_color_info(self, color_index):
+        """获取颜色的完整信息"""
         try:
-            if not self.color_area_pos or color_index >= 16:
+            if not self.collected_colors or color_index >= len(self.collected_colors):
                 return None
             
-            x, y, width, height = self.color_area_pos
-            
-            # 计算颜色块尺寸
-            block_width = width // 2  # 2列
-            block_height = height // 8  # 8行
-            
-            # 计算行列位置
-            row = color_index // 2
-            col = color_index % 2
-            
-            # 计算中心点位置
-            center_x = x + col * block_width + block_width // 2
-            center_y = y + row * block_height + block_height // 2
-            
-            return (center_x, center_y)
+            # 直接从收集的颜色信息中获取完整信息
+            color_info = self.collected_colors[color_index]
+            return color_info
             
         except Exception as e:
-            logging.error(f"获取颜色位置失败: {e}")
+            logging.error(f"获取颜色信息失败: {e}")
             return None
     
-    def _click_position(self, position):
-        """点击指定位置"""
+    def _get_color_info_by_rgb(self, target_rgb):
+        """通过RGB值获取颜色信息"""
         try:
-            # 强制使用Windows API，因为某些游戏可能阻止pyautogui
-            return self._click_position_winapi(position)
+            if not self.collected_colors:
+                return None
             
-        except Exception as e:
-            logging.error(f"点击位置{position}失败: {e}")
-            return False
-    
-    def _click_position_winapi(self, position):
-        """使用Windows API点击位置，包含多种点击方法和重试机制"""
-        try:
-            target_x, target_y = int(position[0]), int(position[1])
+            # 找到最接近的颜色
+            min_distance = float('inf')
+            closest_color_info = None
             
-            # 直接点击目标位置
-            final_x = target_x
-            final_y = target_y
-            
-            # 直接移动到目标位置
-            self._send_mouse_input(final_x, final_y, MOUSEEVENTF_MOVE)
-            logging.debug(f"点击坐标: ({final_x}, {final_y})")
-            
-            # 精确模式使用最小延迟
-            time.sleep(0.005)
-            
-            # 尝试多种点击方法，提高游戏兼容性
-            success = False
-            
-            # 方法1: SendInput API（主要方法）
-            try:
-                self._send_mouse_input(final_x, final_y, MOUSEEVENTF_LEFTDOWN)
-                press_delay = random.uniform(0.008, 0.015)  # 减少按压时间提高速度
-                time.sleep(press_delay)
-                self._send_mouse_input(final_x, final_y, MOUSEEVENTF_LEFTUP)
-                success = True
-                logging.info(f"SendInput点击成功: ({final_x}, {final_y})")
-            except Exception as e:
-                logging.warning(f"SendInput点击失败: {e}，尝试备用方法")
-            
-            # 方法2: SetCursorPos + mouse_event API（备用方法）
-            if not success:
-                try:
-                    # 设置鼠标位置
-                    ctypes.windll.user32.SetCursorPos(final_x, final_y)
-                    time.sleep(0.01)
+            for color_info in self.collected_colors:
+                if not color_info.get('is_parent', False):  # 只考虑子颜色
+                    rgb = color_info['rgb']
+                    distance = sum((a - b) ** 2 for a, b in zip(target_rgb[:3], rgb[:3])) ** 0.5
                     
-                    # 使用mouse_event API
-                    ctypes.windll.user32.mouse_event(0x0002, 0, 0, 0, 0)  # MOUSEEVENTF_LEFTDOWN
-                    time.sleep(random.uniform(0.008, 0.015))  # 减少按压时间
-                    ctypes.windll.user32.mouse_event(0x0004, 0, 0, 0, 0)  # MOUSEEVENTF_LEFTUP
-                    success = True
-                    logging.info(f"mouse_event点击成功: ({final_x}, {final_y})")
-                except Exception as e:
-                    logging.warning(f"mouse_event点击失败: {e}")
+                    if distance < min_distance:
+                        min_distance = distance
+                        closest_color_info = color_info
             
-            # 方法3: 重复点击（某些游戏需要多次点击才能识别）
-            if not success:
-                try:
-                    for attempt in range(2):
-                        self._send_mouse_input(final_x, final_y, MOUSEEVENTF_LEFTDOWN)
-                        time.sleep(0.02)
-                        self._send_mouse_input(final_x, final_y, MOUSEEVENTF_LEFTUP)
-                        time.sleep(0.05)
-                    success = True
-                    logging.info(f"重复点击成功: ({final_x}, {final_y})")
-                except Exception as e:
-                    logging.error(f"重复点击失败: {e}")
-            
-            # 等待点击完成（带随机延迟）
-            final_delay = random.uniform(0.005, 0.015)  # 减少最终延迟提高速度
-            time.sleep(final_delay)
-            
-            if success:
-                logging.debug(f"点击完成: ({final_x}, {final_y})")
-            else:
-                logging.error(f"所有点击方法都失败: ({final_x}, {final_y})")
-            
-            return success
+            return closest_color_info
             
         except Exception as e:
-            logging.error(f"Windows API点击失败: {e}")
+            logging.error(f"通过RGB获取颜色信息失败: {e}")
+            return None
+    
+    def _select_color_for_drawing(self, color_info):
+        """选择颜色进行绘图的完整流程"""
+        try:
+            # 检查是否需要停止
+            if self.should_stop:
+                return False
+            
+            # 获取父颜色信息
+            parent_index = color_info.get('parent_index')
+            if parent_index is None:
+                logging.warning(f"颜色信息中缺少父颜色索引: {color_info}")
+                return False
+            
+            # 1. 点击对应的父颜色按钮
+            parent_color_info = self._get_parent_color_info(parent_index)
+            if not parent_color_info:
+                logging.warning(f"无法获取父颜色信息，索引: {parent_index}")
+                return False
+            
+            logging.info(f"步骤1: 点击父颜色 RGB{parent_color_info['rgb']}")
+            success = click_position(parent_color_info['position'])
+            if not success:
+                logging.warning(f"点击父颜色失败: {parent_color_info['position']}")
+                return False
+            
+            # 等待父颜色选择生效
+            self._interruptible_sleep(0.3)
+            if self.should_stop:
+                return False
+            
+            # 2. 点击色盘按钮进入子颜色区域
+            palette_button_pos = self._get_palette_button_position()
+            if not palette_button_pos:
+                logging.warning("色盘按钮位置未设置")
+                return False
+            
+            logging.info(f"步骤2: 点击色盘按钮进入子颜色区域")
+            success = click_position(palette_button_pos)
+            if not success:
+                logging.warning(f"点击色盘按钮失败: {palette_button_pos}")
+                return False
+            
+            # 等待进入子颜色区域
+            self._interruptible_sleep(0.5)
+            if self.should_stop:
+                return False
+            
+            # 3. 点击对应的子颜色
+            logging.info(f"步骤3: 选择子颜色 RGB{color_info['rgb']}")
+            success = click_position(color_info['position'])
+            if not success:
+                logging.warning(f"点击子颜色失败: {color_info['position']}")
+                return False
+            
+            # 等待子颜色选择生效
+            self._interruptible_sleep(self.color_click_delay)
+            if self.should_stop:
+                return False
+            
+            logging.info(f"颜色选择完成: RGB{color_info['rgb']}")
+            return True
+            
+        except Exception as e:
+            logging.error(f"选择颜色失败: {e}")
             return False
     
-    def _send_mouse_input(self, x, y, flags):
-        """使用 SendInput API 发送鼠标事件"""
+    def _return_to_parent_colors(self):
+        """返回到父颜色区域"""
         try:
-            # 获取屏幕尺寸用于坐标转换
-            screen_width = ctypes.windll.user32.GetSystemMetrics(0)
-            screen_height = ctypes.windll.user32.GetSystemMetrics(1)
+            # 检查是否需要停止
+            if self.should_stop:
+                return
             
-            # 转换为绝对坐标 (0-65535)
-            if flags & MOUSEEVENTF_MOVE or flags & MOUSEEVENTF_LEFTDOWN or flags & MOUSEEVENTF_LEFTUP:
-                abs_x = int(x * 65535 / screen_width)
-                abs_y = int(y * 65535 / screen_height)
-                flags |= MOUSEEVENTF_ABSOLUTE
-                logging.debug(f"鼠标事件: 屏幕坐标({x}, {y}) -> 绝对坐标({abs_x}, {abs_y})")
-            else:
-                abs_x, abs_y = x, y
-
-            # 创建 INPUT 结构体
-            extra = ctypes.c_ulong(0)
-            ii_ = INPUT()
-            ii_.type = INPUT_MOUSE
-            ii_.mi.dx = abs_x
-            ii_.mi.dy = abs_y
-            ii_.mi.mouseData = 0
-            ii_.mi.dwFlags = flags
-            ii_.mi.time = 0
-            ii_.mi.dwExtraInfo = ctypes.pointer(extra)
-
-            # 发送输入事件
-            result = ctypes.windll.user32.SendInput(1, ctypes.byref(ii_), ctypes.sizeof(ii_))
+            # 点击色板返回按钮
+            return_button_pos = self._get_return_button_position()
+            if not return_button_pos:
+                logging.warning("色板返回按钮位置未设置")
+                return
             
-            if result == 0:
-                error_code = ctypes.windll.kernel32.GetLastError()
-                logging.error(f"SendInput失败，错误代码: {error_code}")
-                raise Exception(f"SendInput失败，错误代码: {error_code}")
+            logging.info("返回到父颜色区域")
+            success = click_position(return_button_pos)
+            if success:
+                # 等待返回动画完成
+                self._interruptible_sleep(0.3)
+                logging.info("已返回父颜色区域")
             else:
-                logging.debug(f"鼠标事件发送成功: flags={flags}, 坐标=({x}, {y})")
+                logging.warning(f"点击色板返回按钮失败: {return_button_pos}")
                 
         except Exception as e:
-            logging.error(f"发送鼠标输入失败: {e}")
-            raise
+            logging.error(f"返回父颜色区域失败: {e}")
+    
+    def _get_parent_color_info(self, parent_index):
+        """获取父颜色信息"""
+        try:
+            # 从collected_colors中查找对应的父颜色
+            for color_info in self.collected_colors:
+                if color_info.get('is_parent', False) and color_info.get('parent_index') == parent_index:
+                    return color_info
+            
+            # 如果没有找到父颜色信息，尝试从业务逻辑中获取
+            # 这里需要访问业务逻辑层的父颜色信息
+            logging.warning(f"未找到父颜色信息，索引: {parent_index}")
+            
+            # 尝试通过索引直接查找（如果父颜色是按顺序排列的）
+            parent_colors = [c for c in self.collected_colors if c.get('is_parent', False)]
+            if 0 <= parent_index < len(parent_colors):
+                return parent_colors[parent_index]
+            
+            logging.error(f"父颜色索引 {parent_index} 超出范围，可用父颜色数量: {len(parent_colors)}")
+            return None
+            
+        except Exception as e:
+            logging.error(f"获取父颜色信息失败: {e}")
+            return None
+    
+    def _get_palette_button_position(self):
+        """获取色盘按钮位置"""
+        if self.palette_button_pos:
+            # 计算按钮中心点
+            center_x = self.palette_button_pos[0] + self.palette_button_pos[2] // 2
+            center_y = self.palette_button_pos[1] + self.palette_button_pos[3] // 2
+            return (center_x, center_y)
+        return None
+    
+    def _get_return_button_position(self):
+        """获取色板返回按钮位置"""
+        if self.return_button_pos:
+            # 计算按钮中心点
+            center_x = self.return_button_pos[0] + self.return_button_pos[2] // 2
+            center_y = self.return_button_pos[1] + self.return_button_pos[3] // 2
+            return (center_x, center_y)
+        return None
+    
+
     
     def set_click_delays(self, color_delay=0.5, draw_delay=0.05, move_delay=0.01):
         """设置点击延迟"""
@@ -396,166 +456,6 @@ class DrawingWorker(QThread):
         logging.info(f"点击延迟已设置: 颜色={color_delay}s, 绘图={draw_delay}s, 移动={move_delay}s")
     
 
-
-
-class ClickWorker(QThread):
-    """点击工作线程（用于单次点击操作）"""
-    
-    # 信号定义
-    click_completed = pyqtSignal(bool, str)  # 点击完成 (成功, 消息)
-    
-    def __init__(self, position, click_type="single"):
-        super().__init__()
-        
-        self.position = position
-        self.click_type = click_type  # "single", "double"
-        
-        logging.info(f"点击工作线程初始化: 位置={position}, 类型={click_type}")
-    
-    def run(self):
-        """线程主函数"""
-        try:
-            success = False
-            
-            if self.click_type == "single":
-                success = self._single_click()
-            elif self.click_type == "double":
-                success = self._double_click()
-            
-            if success:
-                self.click_completed.emit(True, f"点击位置{self.position}成功")
-            else:
-                self.click_completed.emit(False, f"点击位置{self.position}失败")
-                
-        except Exception as e:
-            error_msg = f"点击操作失败: {str(e)}"
-            logging.error(error_msg)
-            self.click_completed.emit(False, error_msg)
-    
-    def _single_click(self):
-        """单击"""
-        try:
-            # 优先使用pyautogui
-            try:
-                import pyautogui
-                pyautogui.click(self.position[0], self.position[1])
-                return True
-            except ImportError:
-                pass
-            
-            # 使用Windows API
-            return self._click_winapi()
-            
-        except Exception as e:
-            logging.error(f"单击失败: {e}")
-            return False
-    
-    def _double_click(self):
-        """双击"""
-        try:
-            # 优先使用pyautogui
-            try:
-                import pyautogui
-                pyautogui.doubleClick(self.position[0], self.position[1])
-                return True
-            except ImportError:
-                pass
-            
-            # 使用Windows API执行两次单击
-            success1 = self._click_winapi()
-            time.sleep(0.05)
-            success2 = self._click_winapi()
-            
-            return success1 and success2
-            
-        except Exception as e:
-            logging.error(f"双击失败: {e}")
-            return False
-    
-    def _click_winapi(self):
-        """使用Windows API点击"""
-        try:
-            target_x, target_y = int(self.position[0]), int(self.position[1])
-            
-            # 添加随机偏移，避免总是点击正中心
-            offset_range = 3  # 偏移范围：±3像素
-            random_offset_x = random.randint(-offset_range, offset_range)
-            random_offset_y = random.randint(-offset_range, offset_range)
-            
-            # 计算最终点击位置
-            final_x = target_x + random_offset_x
-            final_y = target_y + random_offset_y
-            
-            logging.debug(f"点击坐标: 原始({target_x}, {target_y}), 最终({final_x}, {final_y})")
-            
-            # 移动到目标位置（带随机偏移）
-            self._send_mouse_input(final_x, final_y, MOUSEEVENTF_MOVE)
-            time.sleep(0.01)
-            
-            # 添加点击前的微抖动延迟
-            jitter_delay = random.uniform(0.02, 0.08)
-            time.sleep(jitter_delay)
-            
-            # 执行点击（带随机延迟）
-            self._send_mouse_input(final_x, final_y, MOUSEEVENTF_LEFTDOWN)
-            press_delay = 0.01 + random.uniform(-0.005, 0.005)
-            press_delay = max(0.005, press_delay)  # 确保最小延迟
-            time.sleep(press_delay)
-            
-            self._send_mouse_input(final_x, final_y, MOUSEEVENTF_LEFTUP)
-            
-            # 等待点击完成（带随机延迟）
-            final_delay = 0.01 + random.uniform(-0.005, 0.005)
-            final_delay = max(0.005, final_delay)  # 确保最小延迟
-            time.sleep(final_delay)
-            
-            logging.debug(f"点击完成: ({final_x}, {final_y})")
-            return True
-            
-        except Exception as e:
-            logging.error(f"Windows API点击失败: {e}")
-            return False
-    
-    def _send_mouse_input(self, x, y, flags):
-        """使用 SendInput API 发送鼠标事件"""
-        try:
-            # 获取屏幕尺寸用于坐标转换
-            screen_width = ctypes.windll.user32.GetSystemMetrics(0)
-            screen_height = ctypes.windll.user32.GetSystemMetrics(1)
-            
-            # 转换为绝对坐标 (0-65535)
-            if flags & MOUSEEVENTF_MOVE or flags & MOUSEEVENTF_LEFTDOWN or flags & MOUSEEVENTF_LEFTUP:
-                abs_x = int(x * 65535 / screen_width)
-                abs_y = int(y * 65535 / screen_height)
-                flags |= MOUSEEVENTF_ABSOLUTE
-                logging.debug(f"鼠标事件: 屏幕坐标({x}, {y}) -> 绝对坐标({abs_x}, {abs_y})")
-            else:
-                abs_x, abs_y = x, y
-
-            # 创建 INPUT 结构体
-            extra = ctypes.c_ulong(0)
-            ii_ = INPUT()
-            ii_.type = INPUT_MOUSE
-            ii_.mi.dx = abs_x
-            ii_.mi.dy = abs_y
-            ii_.mi.mouseData = 0
-            ii_.mi.dwFlags = flags
-            ii_.mi.time = 0
-            ii_.mi.dwExtraInfo = ctypes.pointer(extra)
-
-            # 发送输入事件
-            result = ctypes.windll.user32.SendInput(1, ctypes.byref(ii_), ctypes.sizeof(ii_))
-            
-            if result == 0:
-                error_code = ctypes.windll.kernel32.GetLastError()
-                logging.error(f"SendInput失败，错误代码: {error_code}")
-                raise Exception(f"SendInput失败，错误代码: {error_code}")
-            else:
-                logging.debug(f"鼠标事件发送成功: flags={flags}, 坐标=({x}, {y})")
-                
-        except Exception as e:
-            logging.error(f"发送鼠标输入失败: {e}")
-            raise
 
 
 class ScreenCaptureWorker(QThread):
@@ -650,22 +550,3 @@ class HotkeyWorker(QThread):
                 logging.info("热键注册已清理")
             except Exception as e:
                 logging.error(f"清理热键注册时发生错误: {e}")
-
-
-if __name__ == "__main__":
-    # 测试代码
-    import sys
-    from PyQt5.QtWidgets import QApplication
-    
-    app = QApplication(sys.argv)
-    
-    # 测试点击功能
-    def on_click_completed(success, message):
-        print(f"点击完成: {success}, {message}")
-        app.quit()
-    
-    click_worker = ClickWorker((100, 100))
-    click_worker.click_completed.connect(on_click_completed)
-    click_worker.start()
-    
-    sys.exit(app.exec_())

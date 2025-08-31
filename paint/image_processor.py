@@ -8,7 +8,6 @@ import logging
 import numpy as np
 from PIL import Image, ImageDraw
 from sklearn.cluster import KMeans
-import cv2
 
 
 class ImageProcessor:
@@ -389,6 +388,6 @@ if __name__ == "__main__":
         pixelized = processor.pixelize_image(test_image, (1, 1), 50)
         if pixelized:
             pixelized.save("test_pixelized.png")
-            print("像素化测试完成")
+            logging.info("像素化测试完成")
     else:
-        print("测试图片不存在")
+        logging.warning("测试图片不存在")

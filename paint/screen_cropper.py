@@ -1,9 +1,6 @@
 # save as screen_cropper.py
 from PyQt5 import QtWidgets, QtGui, QtCore
-import sys
 from PIL import ImageGrab
-import cv2
-import numpy as np
 
 class Cropper(QtWidgets.QWidget):
     finished = QtCore.pyqtSignal(object, object)  # 修改信号，传递图片和坐标

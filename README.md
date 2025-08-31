@@ -222,3 +222,5 @@ python pintu.py
 ```bash
    pyinstaller PuzzleApp.spec
  ```
+
+pyinstaller PaintApp.spec

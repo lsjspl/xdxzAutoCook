@@ -7,7 +7,6 @@
 import cv2
 import numpy as np
 import logging
-from PIL import Image, ImageGrab
 
 
 class ImageDetector:
