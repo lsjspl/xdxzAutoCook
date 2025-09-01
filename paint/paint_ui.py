@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
     QPushButton, QLabel, QComboBox, QGroupBox, QMessageBox,
     QFileDialog, QSpinBox, QTextEdit, QScrollArea, QFormLayout,
     QGridLayout, QFrame, QSizePolicy, QDoubleSpinBox, QLineEdit,
-    QCheckBox
+    QCheckBox, QProgressBar
 )
 from PyQt5.QtGui import QPixmap, QImage, QFont, QPainter, QPen, QColor, QKeySequence
 from PyQt5.QtCore import Qt, pyqtSignal, QRect, QTimer
@@ -129,6 +129,7 @@ class PaintMainUI(QWidget):
     process_image_requested = pyqtSignal(str, int)  # 处理图片请求(比例, 像素数量)
     start_drawing_requested = pyqtSignal()  # 开始绘图请求
     stop_drawing_requested = pyqtSignal()  # 停止绘图请求
+    debug_pixels_requested = pyqtSignal()  # 调试像素请求
     
     # 配置管理信号
     config_changed = pyqtSignal(str)  # 配置改变
@@ -155,9 +156,7 @@ class PaintMainUI(QWidget):
         self.collected_colors = []
         self.pixel_info_list = []
         
-        # 游戏窗口位置信息
-        self.last_game_window_pos = None
-        self.last_game_window_size = None
+
         
         # 初始化UI
         self.init_ui()
@@ -166,7 +165,7 @@ class PaintMainUI(QWidget):
         # 创建检测覆盖层
         self.detection_overlay = DetectionOverlay()
         
-        # 游戏窗口检测按钮（手动检测，不使用定时器）
+
         
         # 设置焦点策略，确保能接收键盘事件
         self.setFocusPolicy(Qt.StrongFocus)
@@ -178,6 +177,40 @@ class PaintMainUI(QWidget):
         self.check_ready_state()
         
         logging.info("绘图助手UI初始化完成")
+    
+    def reset_image_related_data(self):
+        """重置UI中的图片相关数据，保留用户配置"""
+        logging.info("重置UI中的图片相关数据")
+        
+        # 重置图片相关的数据
+        self.selected_image_path = None
+        self.pixelized_image = None
+        self.color_palette = []
+        self.pixel_info_list = []
+        
+        # 重置UI显示
+        self.image_path_label.setText("未选择图片")
+        self.image_path_label.setStyleSheet("color: red;")
+        self.original_image_label.setText("请选择图片")
+        self.process_image_btn.setEnabled(False)
+        
+        # 清除像素化图片预览
+        if hasattr(self, 'pixelized_image_label'):
+            self.pixelized_image_label.setText("请先处理图片")
+        
+        # 注意：不重置以下用户配置相关的数据
+        # - draw_area_pos (绘画区域)
+        # - parent_color_area_pos (父颜色区域)
+        # - color_palette_button_pos (色盘按钮)
+        # - color_swatch_return_button_pos (色板返回按钮)
+        # - child_color_area_pos (子颜色区域)
+        # - background_color_button_pos (背景色按钮)
+        # - collected_colors (收集的颜色)
+        
+        # 重新检查就绪状态
+        self.check_ready_state()
+        
+        logging.info("UI中的图片相关数据已重置")
     
     def _setup_exception_handling(self):
         """设置全局异常处理器，捕获Qt异常"""
@@ -344,7 +377,7 @@ class PaintMainUI(QWidget):
         
         self.draw_delay_spin = QDoubleSpinBox()
         self.draw_delay_spin.setRange(0.001, 10.0)
-        self.draw_delay_spin.setValue(0.001)
+        self.draw_delay_spin.setValue(0.101)
         self.draw_delay_spin.setSingleStep(0.001)
         self.draw_delay_spin.setSuffix(" 秒")
         self.draw_delay_spin.setDecimals(5)
@@ -355,6 +388,12 @@ class PaintMainUI(QWidget):
         self.move_delay_spin.setSingleStep(0.001)
         self.move_delay_spin.setSuffix(" 秒")
         self.move_delay_spin.setDecimals(5)
+
+        # 连画模式设置
+        self.continuous_drawing_checkbox = QCheckBox("启用连画模式")
+        self.continuous_drawing_checkbox.setToolTip("勾选后，连续像素将瞬间拖动绘制（从开始到结束一瞬间完成），大幅提高绘画效率")
+        self.continuous_drawing_checkbox.setChecked(True)  # 默认启用
+        
 
 
         # 处理图片按钮
@@ -385,12 +424,16 @@ class PaintMainUI(QWidget):
         step3_layout.addRow("颜色点击延迟:", self.color_delay_spin)
         step3_layout.addRow("绘图点击延迟:", self.draw_delay_spin)
         step3_layout.addRow("鼠标移动延迟:", self.move_delay_spin)
+        step3_layout.addRow("", self.continuous_drawing_checkbox)  # 空标签，复选框独占一行
         step3_layout.addRow("处理图片:", self.process_image_btn)
         step3_group.setLayout(step3_layout)
         
         # 步骤4: 开始绘图
         step4_group = QGroupBox("步骤4: 开始绘图")
         step4_layout = QVBoxLayout()
+        
+        # 绘图按钮布局
+        drawing_buttons_layout = QHBoxLayout()
         
         self.start_drawing_btn = QPushButton("开始绘图")
         self.start_drawing_btn.setMinimumHeight(50)
@@ -413,8 +456,51 @@ class PaintMainUI(QWidget):
         """)
         self.start_drawing_btn.setEnabled(False)
         
-        step4_layout.addWidget(self.start_drawing_btn)
+        self.debug_pixels_btn = QPushButton("调试像素")
+        self.debug_pixels_btn.setMinimumHeight(50)
+        self.debug_pixels_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: white;
+                font-size: 14px;
+                font-weight: bold;
+                border: none;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #F57C00;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+                color: #666666;
+            }
+        """)
+        self.debug_pixels_btn.setEnabled(False)
+        
+        drawing_buttons_layout.addWidget(self.start_drawing_btn)
+        drawing_buttons_layout.addWidget(self.debug_pixels_btn)
+        
+        step4_layout.addLayout(drawing_buttons_layout)
         step4_group.setLayout(step4_layout)
+        
+        # 绘图进度显示
+        progress_group = QGroupBox("绘图进度")
+        progress_layout = QVBoxLayout()
+        
+        # 进度条
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setMinimumHeight(25)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("进度: %p% (%v/%m)")
+        
+        # 进度标签
+        self.progress_label = QLabel("等待开始绘图...")
+        self.progress_label.setStyleSheet("color: #666; font-size: 12px;")
+        
+        progress_layout.addWidget(self.progress_bar)
+        progress_layout.addWidget(self.progress_label)
+        progress_group.setLayout(progress_layout)
         
         # 状态显示
         status_group = QGroupBox("状态信息")
@@ -472,31 +558,26 @@ class PaintMainUI(QWidget):
         config_layout.addLayout(config_buttons_layout)
         config_group.setLayout(config_layout)
         
-        # 游戏窗口控制组
-        game_window_group = QGroupBox("游戏窗口控制")
-        game_window_layout = QVBoxLayout()
+        # 绘画区域显示控制组
+        draw_area_display_group = QGroupBox("绘画区域显示控制")
+        draw_area_display_layout = QVBoxLayout()
         
-        # 创建游戏窗口显示控制checkbox
-        self.show_game_window_checkbox = QCheckBox("显示游戏窗口框")
-        self.show_game_window_checkbox.setChecked(True)  # 默认显示
-        self.show_game_window_checkbox.stateChanged.connect(self._on_game_window_checkbox_changed)
+        # 创建绘画区域显示控制checkbox
+        self.show_draw_area_checkbox = QCheckBox("显示绘画区域框")
+        self.show_draw_area_checkbox.setChecked(True)  # 默认显示
+        self.show_draw_area_checkbox.stateChanged.connect(self._on_draw_area_checkbox_changed)
         
-        # 创建游戏窗口检测按钮
-        self.detect_game_window_btn = QPushButton("检测游戏窗口")
-        self.detect_game_window_btn.setMinimumHeight(35)
-        self.detect_game_window_btn.clicked.connect(self._on_detect_game_window_clicked)
-        
-        game_window_layout.addWidget(self.show_game_window_checkbox)
-        game_window_layout.addWidget(self.detect_game_window_btn)
-        game_window_group.setLayout(game_window_layout)
+        draw_area_display_layout.addWidget(self.show_draw_area_checkbox)
+        draw_area_display_group.setLayout(draw_area_display_layout)
         
         # 添加所有组件到面板
         layout.addWidget(step1_group)
         layout.addWidget(step2_group)
         layout.addWidget(step3_group)
         layout.addWidget(step4_group)
+        layout.addWidget(progress_group)
         layout.addWidget(config_group)
-        layout.addWidget(game_window_group)
+        layout.addWidget(draw_area_display_group)
         layout.addWidget(status_group)
         layout.addStretch()
         
@@ -610,6 +691,7 @@ class PaintMainUI(QWidget):
         self.select_image_btn.clicked.connect(self.select_image_requested.emit)
         self.process_image_btn.clicked.connect(self.on_process_image_clicked)
         self.start_drawing_btn.clicked.connect(self.start_drawing_requested.emit)
+        self.debug_pixels_btn.clicked.connect(self.debug_pixels_requested.emit)
         
         # 配置管理信号连接
         self.btn_save_config.clicked.connect(self.save_config_requested.emit)
@@ -652,14 +734,19 @@ class PaintMainUI(QWidget):
             """)
             self.update_status_text(f"绘画区域已设置: {position[2]}×{position[3]} 像素")
             
-            # 在覆盖层上显示绘画区域
-            if hasattr(self, 'detection_overlay') and self.detection_overlay:
-                self.detection_overlay.set_draw_area_position(position[:2], position[2:])
-                self.detection_overlay.show_draw_area_overlay(True)
-                # 确保覆盖层可见
-                if not self.detection_overlay.isVisible():
-                    self.detection_overlay.show()
-                    self.detection_overlay.raise_()
+            # 保存绘画区域位置信息，用于显示控制
+            self.last_draw_area_pos = position[:2]
+            self.last_draw_area_size = position[2:]
+            
+            # 根据checkbox状态决定是否显示绘画区域
+            if hasattr(self, 'show_draw_area_checkbox') and self.show_draw_area_checkbox.isChecked():
+                if hasattr(self, 'detection_overlay') and self.detection_overlay:
+                    self.detection_overlay.set_draw_area_position(position[:2], position[2:])
+                    self.detection_overlay.show_draw_area_overlay(True)
+                    # 确保覆盖层可见
+                    if not self.detection_overlay.isVisible():
+                        self.detection_overlay.show()
+                        self.detection_overlay.raise_()
         else:
             self.select_draw_area_btn.setStyleSheet("")
             # 隐藏绘画区域显示
@@ -820,6 +907,124 @@ class PaintMainUI(QWidget):
             logging.error(f"显示像素化图片失败: {e}")
             self.pixelized_image_label.setText(f"像素化失败: {str(e)}")
     
+    def display_pixel_debug_info(self, pixel_info_list):
+        """显示像素调试信息"""
+        try:
+            if not pixel_info_list:
+                self.update_status_text("没有像素信息可显示")
+                return
+            
+            # 创建调试信息文本
+            debug_text = f"像素调试信息 (共{len(pixel_info_list)}个像素点):\n\n"
+            
+            # 显示前20个像素的详细信息
+            for i, pixel_info in enumerate(pixel_info_list[:20]):
+                position = pixel_info['position']
+                color = pixel_info['color']
+                grid_pos = pixel_info.get('grid_pos', (0, 0))
+                debug_text += f"像素{i+1}: 坐标({position[0]},{position[1]}) 颜色RGB{color} 网格({grid_pos[0]},{grid_pos[1]})\n"
+            
+            if len(pixel_info_list) > 20:
+                debug_text += f"\n... 还有{len(pixel_info_list)-20}个像素点\n"
+            
+            # 统计信息
+            positions = [info['position'] for info in pixel_info_list]
+            unique_positions = len(set(positions))
+            debug_text += f"\n统计信息:\n"
+            debug_text += f"- 总像素数: {len(pixel_info_list)}\n"
+            debug_text += f"- 唯一位置数: {unique_positions}\n"
+            debug_text += f"- 重复位置数: {len(positions) - unique_positions}\n"
+            
+            # 显示在状态栏
+            self.update_status_text(debug_text)
+            
+            # 同时输出到日志
+            logging.info(f"像素调试信息: {debug_text}")
+            
+            # 询问用户是否要在绘画区域显示像素点
+            from PyQt5.QtWidgets import QMessageBox
+            reply = QMessageBox.question(
+                self, 
+                '显示像素点', 
+                f'是否要在绘画区域显示所有{len(pixel_info_list)}个像素点？\n这将帮助您直观地看到像素分布。',
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            
+            if reply == QMessageBox.Yes:
+                self.display_pixels_on_screen(pixel_info_list)
+            
+        except Exception as e:
+            logging.error(f"显示像素调试信息失败: {e}")
+            self.update_status_text(f"显示像素调试信息失败: {str(e)}")
+    
+    def display_pixels_on_screen(self, pixel_info_list):
+        """在屏幕上显示像素点overlay"""
+        try:
+            if not pixel_info_list:
+                self.update_status_text("没有像素信息可显示")
+                return
+            
+            if not self.draw_area_pos:
+                self.update_status_text("没有绘画区域信息，无法显示overlay")
+                return
+            
+            self.update_status_text(f"正在创建像素点overlay，共{len(pixel_info_list)}个像素点...")
+            
+            # 创建像素点overlay窗口
+            from pixel_overlay import PixelOverlay
+            self.pixel_overlay = PixelOverlay(
+                pixel_info_list=pixel_info_list,
+                draw_area_pos=self.draw_area_pos
+            )
+            
+            # 显示overlay
+            self.pixel_overlay.show()
+            
+            logging.info(f"像素点overlay已显示，共{len(pixel_info_list)}个像素点")
+            
+        except Exception as e:
+            logging.error(f"显示像素点overlay失败: {e}")
+            self.update_status_text(f"显示像素点overlay失败: {str(e)}")
+    
+    def on_debug_drawing_completed(self):
+        """调试绘图完成回调"""
+        try:
+            self.update_status_text("像素点显示完成！")
+            logging.info("调试像素点显示完成")
+            
+            # 清理工作线程
+            if hasattr(self, 'debug_worker'):
+                self.debug_worker.quit()
+                self.debug_worker.wait(5000)  # 等待最多5秒
+                if self.debug_worker.isRunning():
+                    self.debug_worker.terminate()
+                    self.debug_worker.wait(2000)  # 再等待2秒
+                delattr(self, 'debug_worker')
+                
+        except Exception as e:
+            logging.error(f"调试绘图完成处理失败: {e}")
+    
+    def closeEvent(self, event):
+        """窗口关闭事件"""
+        try:
+            # 清理所有工作线程
+            if hasattr(self, 'debug_worker'):
+                self.debug_worker.quit()
+                self.debug_worker.wait(3000)  # 等待3秒
+                if self.debug_worker.isRunning():
+                    self.debug_worker.terminate()
+                    self.debug_worker.wait(2000)  # 再等待2秒
+            
+            # 关闭像素overlay
+            if hasattr(self, 'pixel_overlay'):
+                self.pixel_overlay.close()
+                
+        except Exception as e:
+            logging.error(f"窗口关闭时清理线程失败: {e}")
+        
+        event.accept()
+    
 
     
     def check_ready_state(self):
@@ -863,6 +1068,10 @@ class PaintMainUI(QWidget):
         logging.debug(f"[DEBUG] UI总体就绪状态: {ready}")
         
         self.start_drawing_btn.setEnabled(ready)
+        
+        # 检查调试像素按钮状态（只要有像素化图片就可以调试）
+        debug_ready = pixelized_ready
+        self.debug_pixels_btn.setEnabled(debug_ready)
         
         # 检查收集颜色按钮状态
         collect_ready = (parent_color_ready and 
@@ -929,6 +1138,47 @@ class PaintMainUI(QWidget):
     def update_drawing_progress(self, progress_text):
         """更新绘图进度"""
         self.update_status_text(f"绘图进度: {progress_text}")
+    
+    def update_progress_bar(self, current, total):
+        """更新进度条"""
+        try:
+            if total > 0:
+                percentage = int((current / total) * 100)
+                self.progress_bar.setValue(percentage)
+                
+                # 更新进度标签
+                self.progress_label.setText(f"正在绘制: {current}/{total} ({percentage}%)")
+                
+                # 根据进度改变颜色
+                if percentage < 30:
+                    self.progress_bar.setStyleSheet("QProgressBar::chunk { background-color: #FF9800; }")
+                elif percentage < 70:
+                    self.progress_bar.setStyleSheet("QProgressBar::chunk { background-color: #2196F3; }")
+                else:
+                    self.progress_bar.setStyleSheet("QProgressBar::chunk { background-color: #4CAF50; }")
+            else:
+                self.progress_bar.setValue(0)
+                self.progress_label.setText("等待开始绘图...")
+        except Exception as e:
+            logging.error(f"更新进度条失败: {e}")
+    
+    def reset_progress_bar(self):
+        """重置进度条"""
+        try:
+            self.progress_bar.setValue(0)
+            self.progress_label.setText("等待开始绘图...")
+            self.progress_bar.setStyleSheet("")
+        except Exception as e:
+            logging.error(f"重置进度条失败: {e}")
+    
+    def set_progress_bar_max(self, max_value):
+        """设置进度条最大值"""
+        try:
+            self.progress_bar.setMaximum(max_value)
+            self.progress_bar.setValue(0)
+            self.progress_label.setText(f"准备绘制: 0/{max_value} (0%)")
+        except Exception as e:
+            logging.error(f"设置进度条最大值失败: {e}")
     
     def get_draw_area_position(self):
         """获取绘画区域位置"""
@@ -1364,6 +1614,12 @@ class PaintMainUI(QWidget):
             'move_delay': self.move_delay_spin.value()
         }
     
+    def get_continuous_drawing_enabled(self):
+        """获取连画模式是否启用"""
+        return self.continuous_drawing_checkbox.isChecked()
+    
+
+    
     # 配置管理方法
     def get_current_config_name(self):
         """获取当前配置名称"""
@@ -1408,81 +1664,59 @@ class PaintMainUI(QWidget):
         """清空配置名称"""
         self.config_combo.clearEditText()
     
-    def set_game_window_position(self, pos, size):
-        """设置游戏窗口位置和大小"""
-        self.last_game_window_pos = pos
-        self.last_game_window_size = size
-        self.update_status_text(f"游戏窗口位置已设置: 位置{pos}, 大小{size}")
-    
-    def show_game_window_position(self, pos, size):
-        """显示游戏窗口位置"""
-        # 保存游戏窗口信息
-        self.last_game_window_pos = pos
-        self.last_game_window_size = size
+    def show_draw_area_position(self, pos, size):
+        """显示绘画区域位置"""
+        # 保存绘画区域信息
+        self.last_draw_area_pos = pos
+        self.last_draw_area_size = size
         
-        # 只有在checkbox选中时才显示游戏窗口框
-        if hasattr(self, 'show_game_window_checkbox') and self.show_game_window_checkbox.isChecked():
+        # 只有在checkbox选中时才显示绘画区域框
+        if hasattr(self, 'show_draw_area_checkbox') and self.show_draw_area_checkbox.isChecked():
             if hasattr(self, 'detection_overlay') and self.detection_overlay:
-                self.detection_overlay.set_game_window_position(pos, size)
-                self.detection_overlay.show_game_window_overlay(True)
+                self.detection_overlay.set_draw_area_position(pos, size)
+                self.detection_overlay.show_draw_area_overlay(True)
                 
                 # 确保覆盖层可见
                 if not self.detection_overlay.isVisible():
                     self.detection_overlay.show()
                     self.detection_overlay.raise_()
                 
-                self.update_status_text(f"游戏窗口位置: ({pos[0]}, {pos[1]}), 大小: {size[0]}x{size[1]}")
+                self.update_status_text(f"绘画区域已显示: 位置({pos[0]}, {pos[1]}), 大小: {size[0]}x{size[1]}")
             else:
                 self.update_status_text("检测覆盖层不可用")
         else:
-            self.update_status_text(f"游戏窗口位置已更新: ({pos[0]}, {pos[1]}), 大小: {size[0]}x{size[1]} (框已隐藏)")
+            self.update_status_text(f"绘画区域已更新: 位置({pos[0]}, {pos[1]}), 大小: {size[0]}x{size[1]} (框已隐藏)")
     
-    # 移除定时刷新方法，改为手动检测
-    
-    def _on_game_window_checkbox_changed(self, state):
-        """处理游戏窗口显示checkbox状态改变"""
+    def _on_draw_area_checkbox_changed(self, state):
+        """处理绘画区域显示checkbox状态改变"""
         try:
             if state == Qt.Checked:
-                # 显示游戏窗口框
+                # 显示绘画区域框
                 if hasattr(self, 'detection_overlay') and self.detection_overlay:
-                    # 如果有保存的游戏窗口位置，直接显示
-                    if self.last_game_window_pos and self.last_game_window_size:
-                        self.detection_overlay.set_game_window_position(self.last_game_window_pos, self.last_game_window_size)
-                        self.detection_overlay.show_game_window_overlay(True)
-                        if not self.detection_overlay.isVisible():
-                            self.detection_overlay.show()
-                            self.detection_overlay.raise_()
-                        self.update_status_text("游戏窗口框已显示")
+                    # 如果有保存的绘画区域位置，直接显示
+                    if hasattr(self, 'last_draw_area_pos') and hasattr(self, 'last_draw_area_size'):
+                        if self.last_draw_area_pos and self.last_draw_area_size:
+                            self.detection_overlay.set_draw_area_position(self.last_draw_area_pos, self.last_draw_area_size)
+                            self.detection_overlay.show_draw_area_overlay(True)
+                            if not self.detection_overlay.isVisible():
+                                self.detection_overlay.show()
+                                self.detection_overlay.raise_()
+                            self.update_status_text("绘画区域框已显示")
+                        else:
+                            # 没有保存的位置，提示用户先选择绘画区域
+                            self.update_status_text("没有保存的绘画区域位置，请先选择绘画区域")
                     else:
-                        # 没有保存的位置，提示用户点击检测按钮
-                        self.update_status_text("没有保存的游戏窗口位置，请点击'检测游戏窗口'按钮")
+                        self.update_status_text("没有保存的绘画区域位置，请先选择绘画区域")
                 else:
                     self.update_status_text("检测覆盖层不可用")
             else:
-                # 隐藏游戏窗口框
+                # 隐藏绘画区域框
                 if hasattr(self, 'detection_overlay') and self.detection_overlay:
-                    self.detection_overlay.show_game_window_overlay(False)
-                    self.update_status_text("游戏窗口框已隐藏")
+                    self.detection_overlay.show_draw_area_overlay(False)
+                    self.update_status_text("绘画区域框已隐藏")
         except Exception as e:
-            logging.error(f"处理游戏窗口checkbox状态改变失败: {e}")
-            self.update_status_text(f"游戏窗口控制失败: {str(e)}")
-    
-    def _on_detect_game_window_clicked(self):
-        """处理游戏窗口检测按钮点击"""
-        try:
-            self.update_status_text("正在检测游戏窗口...")
-            if hasattr(self.parent(), 'business'):
-                business = self.parent().business
-                if hasattr(business, 'get_game_window_info'):
-                    business.get_game_window_info()
-                    self.update_status_text("游戏窗口检测完成")
-                else:
-                    self.update_status_text("游戏窗口检测功能不可用")
-            else:
-                self.update_status_text("无法访问业务逻辑")
-        except Exception as e:
-            logging.error(f"游戏窗口检测失败: {e}")
-            self.update_status_text(f"游戏窗口检测失败: {str(e)}")
+            logging.error(f"处理绘画区域checkbox状态改变失败: {e}")
+            self.update_status_text(f"绘画区域控制失败: {str(e)}")
 
 
 class DetectionOverlay(QWidget):
@@ -1499,11 +1733,6 @@ class DetectionOverlay(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground)  # 透明背景
         self.setAttribute(Qt.WA_ShowWithoutActivating)  # 显示时不激活
         
-        # 游戏窗口位置信息
-        self.game_window_pos = None
-        self.game_window_size = None
-        self.show_game_window = False
-        
         # 绘画区域位置信息
         self.draw_area_pos = None
         self.draw_area_size = None
@@ -1513,16 +1742,7 @@ class DetectionOverlay(QWidget):
         screen = QApplication.primaryScreen()
         self.setGeometry(screen.geometry())
         
-    def set_game_window_position(self, pos, size):
-        """设置游戏窗口位置和大小"""
-        self.game_window_pos = pos
-        self.game_window_size = size
-        self.update()
-    
-    def show_game_window_overlay(self, show=True):
-        """显示或隐藏游戏窗口位置"""
-        self.show_game_window = show
-        self.update()
+
     
     def set_draw_area_position(self, pos, size):
         """设置绘画区域位置和大小"""
@@ -1539,33 +1759,6 @@ class DetectionOverlay(QWidget):
         """绘制检测框"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        
-        # 绘制游戏窗口位置（绿色方框）
-        if self.show_game_window and self.game_window_pos and self.game_window_size:
-            x, y = self.game_window_pos
-            width, height = self.game_window_size
-            
-            # 绘制绿色方框
-            pen = QPen(QColor(0, 255, 0), 3)  # 绿色，3像素宽度
-            painter.setPen(pen)
-            painter.drawRect(x, y, width, height)
-            
-            # 绘制标签
-            text = f"游戏窗口 ({width}x{height})"
-            font = QFont("Arial", 12, QFont.Bold)
-            painter.setFont(font)
-            
-            # 文本背景
-            text_rect = painter.fontMetrics().boundingRect(text)
-            text_rect.moveTop(y - text_rect.height() - 5)
-            text_rect.moveLeft(x)
-            
-            # 绘制文本背景
-            painter.fillRect(text_rect, QColor(0, 0, 0, 150))
-            
-            # 绘制文本
-            painter.setPen(QColor(0, 255, 0))
-            painter.drawText(text_rect, Qt.AlignCenter, text)
         
         # 绘制绘画区域位置（绿色方框）
         if self.show_draw_area and self.draw_area_pos and self.draw_area_size:

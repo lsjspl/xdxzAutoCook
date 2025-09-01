@@ -23,7 +23,8 @@ class PaintBusiness(QObject):
     drawing_progress = pyqtSignal(int, int)  # 绘图进度 (当前, 总数)
     drawing_completed = pyqtSignal()  # 绘图完成
     colors_collected = pyqtSignal(list)  # 颜色收集完成
-    game_window_position_updated = pyqtSignal(tuple, tuple)  # 游戏窗口位置更新 (位置, 大小)
+    pixel_debug_requested = pyqtSignal(list)  # 像素调试信息请求
+
     
     def __init__(self):
         super().__init__()
@@ -51,9 +52,7 @@ class PaintBusiness(QObject):
         self.color_palette = []
         self.pixel_info_list = []
         
-        # 游戏窗口位置和大小
-        self.game_window_pos = None  # (x, y)
-        self.game_window_size = None  # (width, height)
+
         
         # 新增：收集到的颜色信息
         self.collected_colors = []  # 存储收集到的所有颜色信息
@@ -68,6 +67,29 @@ class PaintBusiness(QObject):
         self.mouse_move_delay = 0.01  # 鼠标移动延迟
         
         logging.info("绘图业务逻辑初始化完成")
+    
+    def reset_image_related_data(self):
+        """重置图片相关的数据，保留用户配置"""
+        with self._state_lock:
+            logging.info("重置business中的图片相关数据")
+            
+            # 重置图片相关的数据
+            self.selected_image_path = None
+            self.pixelized_image = None
+            self.color_palette = []
+            self.pixel_info_list = []
+            
+            # 注意：不重置以下用户配置相关的数据
+            # - draw_area_pos (绘画区域)
+            # - parent_color_area_pos (父颜色区域)
+            # - color_palette_button_pos (色盘按钮)
+            # - color_swatch_return_button_pos (色板返回按钮)
+            # - child_color_area_pos (子颜色区域)
+            # - background_color_button_pos (背景色按钮)
+            # - collected_colors (收集的颜色)
+            # - 各种延迟配置
+            
+            logging.info("business中的图片相关数据已重置")
     
     def set_draw_area(self, position):
         """设置绘画区域"""
@@ -771,9 +793,7 @@ class PaintBusiness(QObject):
                 'child_color_area_pos': self.child_color_area_pos,
                 'background_color_button_pos': self.background_color_button_pos,
                 
-                # 游戏窗口信息
-                'game_window_pos': self.game_window_pos,
-                'game_window_size': self.game_window_size,
+
                 
                 # 延迟配置
                 'color_click_delay': self.color_click_delay,
@@ -855,12 +875,7 @@ class PaintBusiness(QObject):
             self.pixelized_image = None
             self.pixel_info_list = []
             
-            # 恢复游戏窗口信息
-            if config_data.get('game_window_pos') and config_data.get('game_window_size'):
-                self.game_window_pos = tuple(config_data['game_window_pos'])
-                self.game_window_size = tuple(config_data['game_window_size'])
-                # 发出游戏窗口位置更新信号
-                self.game_window_position_updated.emit(self.game_window_pos, self.game_window_size)
+
             
             self.status_updated.emit(f"配置 '{config_name}' 加载成功")
             logging.info(f"配置 '{config_name}' 加载成功")
@@ -905,74 +920,7 @@ class PaintBusiness(QObject):
             logging.error(f"检查配置是否存在失败: {e}")
             return False
 
-    def set_game_window_position(self, pos, size):
-        """设置游戏窗口位置和大小"""
-        with self._state_lock:
-            self.game_window_pos = pos
-            self.game_window_size = size
-            if pos and size:
-                logging.info(f"游戏窗口位置已设置: 位置{pos}, 大小{size}")
-                self.status_updated.emit(f"游戏窗口位置已设置: 位置{pos}, 大小{size}")
-                # 发送信号通知UI更新
-                self.game_window_position_updated.emit(pos, size)
-            else:
-                logging.info("游戏窗口位置已清除")
-                self.status_updated.emit("游戏窗口位置已清除")
-    
-    def get_game_window_position(self):
-        """获取游戏窗口位置和大小"""
-        with self._state_lock:
-            return self.game_window_pos, self.game_window_size
-    
-    def get_game_window_info(self):
-        """自动获取游戏窗口信息"""
-        try:
-            import win32gui
-            import win32con
-            
-            logging.info("开始查找心动小镇游戏窗口...")
-            
-            # 查找心动小镇游戏窗口
-            def enum_windows_callback(hwnd, windows):
-                if win32gui.IsWindowVisible(hwnd):
-                    window_text = win32gui.GetWindowText(hwnd)
-                    # 记录所有可见窗口（用于调试）
-                    if window_text.strip():
-                        logging.debug(f"发现窗口: '{window_text}'")
-                    
-                    # 专门查找心动小镇游戏窗口
-                    if any(keyword in window_text for keyword in ['心动小镇', '心动', '小镇', '心动小镇游戏']):
-                        windows.append(hwnd)
-                        logging.info(f"找到心动小镇游戏窗口: '{window_text}'")
-                return True
-            
-            windows = []
-            win32gui.EnumWindows(enum_windows_callback, windows)
-            
-            logging.info(f"总共找到 {len(windows)} 个心动小镇相关窗口")
-            
-            if windows:
-                hwnd = windows[0]  # 使用第一个匹配的窗口
-                rect = win32gui.GetWindowRect(hwnd)
-                x, y, right, bottom = rect
-                width = right - x
-                height = bottom - y
-                
-                # 更新游戏窗口信息
-                self.set_game_window_position((x, y), (width, height))
-                
-                logging.info(f"获取到心动小镇游戏窗口信息: 位置({x}, {y}), 大小({width}x{height})")
-                return True
-            else:
-                logging.warning("未找到心动小镇游戏窗口，请确保游戏正在运行")
-                return False
-                
-        except ImportError:
-            logging.warning("win32gui模块未安装，无法自动获取游戏窗口信息")
-            return False
-        except Exception as e:
-            logging.error(f"获取游戏窗口信息失败: {e}")
-            return False
+
 
 
 if __name__ == "__main__":

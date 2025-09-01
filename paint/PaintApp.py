@@ -54,7 +54,7 @@ class PaintAppController(QObject):
         # 初始化配置系统
         self._initialize_config_system()
         
-        # 不自动检测游戏窗口，由用户通过checkbox控制
+
         
         logging.info("绘图助手控制器初始化完成")
     
@@ -73,6 +73,7 @@ class PaintAppController(QObject):
         self.ui.start_drawing_requested.connect(self._on_start_drawing)
         self.ui.stop_drawing_requested.connect(self._on_stop_drawing)
         self.ui.clear_colors_requested.connect(self._on_clear_colors)
+        self.ui.debug_pixels_requested.connect(self._on_debug_pixels)
         
         # 配置管理信号连接
         self.ui.save_config_requested.connect(self._on_save_config)
@@ -87,10 +88,11 @@ class PaintAppController(QObject):
         # 业务逻辑 -> UI
         self.business.status_updated.connect(self.ui.update_status_text)
         self.business.image_processed.connect(self.ui.display_pixelized_image)
-        self.business.drawing_progress.connect(self.ui.update_drawing_progress)
+        self.business.drawing_progress.connect(self.ui.update_progress_bar)
         self.business.drawing_completed.connect(self._on_drawing_completed)
         self.business.colors_collected.connect(self.ui.set_collected_colors)
-        self.business.game_window_position_updated.connect(self.ui.show_game_window_position)
+        self.business.pixel_debug_requested.connect(self.ui.display_pixel_debug_info)
+
         
         logging.info("业务逻辑信号连接完成")
     
@@ -113,13 +115,16 @@ class PaintAppController(QObject):
     def _on_select_draw_area(self):
         """处理选择绘画区域请求"""
         try:
-            from screen_cropper import crop_screen_region
+            from screen_cropper import crop_screen_region, crop_point_region
             
             def on_crop_finished(img, position):
                 if img and position:
                     self.business.set_draw_area(position)
                     self.ui.set_draw_area(position)  # 同时更新UI状态
                     logging.info(f"绘画区域已设置: {position}")
+                    
+                    # 更新绘画区域显示
+                    self._update_draw_area_display()
                 else:
                     self.ui.update_status_text("绘画区域选择已取消")
                 
@@ -127,9 +132,35 @@ class PaintAppController(QObject):
                 if hasattr(self, '_current_cropper'):
                     self._current_cropper = None
             
-            # 启动屏幕截图工具
-            self.ui.update_status_text("请框选绘画区域...")
-            self._current_cropper = crop_screen_region(on_crop_finished, return_position=True)
+            # 询问用户选择方式
+            from PyQt5.QtWidgets import QMessageBox
+            
+            msg_box = QMessageBox()
+            msg_box.setWindowTitle("选择绘图区域方式")
+            msg_box.setText("请选择绘图区域的选择方式：")
+            msg_box.setInformativeText("• 框选：拖拽鼠标框选区域\n• 点选：点击左上角和右下角两个点")
+            
+            # 添加按钮
+            box_select_btn = msg_box.addButton("框选方式", QMessageBox.ActionRole)
+            point_select_btn = msg_box.addButton("点选方式", QMessageBox.ActionRole)
+            cancel_btn = msg_box.addButton("取消", QMessageBox.RejectRole)
+            
+            # 设置默认按钮
+            msg_box.setDefaultButton(box_select_btn)
+            
+            # 显示对话框
+            result = msg_box.exec_()
+            
+            if result == 0:  # 框选方式
+                self.ui.update_status_text("请框选绘画区域...")
+                self._current_cropper = crop_screen_region(on_crop_finished, return_position=True)
+            elif result == 1:  # 点选方式
+                self.ui.update_status_text("请点选绘画区域：第一步点击左上角，第二步点击右下角...")
+                self._current_cropper = crop_point_region(on_crop_finished, return_position=True)
+            else:
+                # 用户取消
+                self.ui.update_status_text("绘画区域选择已取消")
+                return
             
         except Exception as e:
             logging.error(f"选择绘画区域失败: {e}")
@@ -291,38 +322,32 @@ class PaintAppController(QObject):
             logging.error(f"清理颜色失败: {e}")
             self.ui.update_status_text(f"清理颜色失败: {str(e)}")
     
-    def _auto_detect_game_window(self):
-        """自动检测游戏窗口"""
+    def _on_debug_pixels(self):
+        """处理调试像素请求"""
         try:
-            logging.info("开始自动检测游戏窗口...")
-            success = self.business.get_game_window_info()
-            if success:
-                logging.info("游戏窗口自动检测成功")
-                self.ui.update_status_text("游戏窗口自动检测成功")
+            pixel_info_list = self.business.get_pixel_info_list()
+            if pixel_info_list:
+                self.ui.display_pixel_debug_info(pixel_info_list)
+                logging.info("像素调试信息已显示")
             else:
-                logging.warning("游戏窗口自动检测失败，请确保游戏正在运行")
-                self.ui.update_status_text("游戏窗口自动检测失败，请确保游戏正在运行")
+                self.ui.update_status_text("没有像素信息可调试，请先处理图片")
+                logging.warning("没有像素信息可调试")
         except Exception as e:
-            logging.error(f"自动检测游戏窗口时发生错误: {e}")
-            self.ui.update_status_text(f"自动检测游戏窗口失败: {str(e)}")
+            logging.error(f"调试像素失败: {e}")
+            self.ui.update_status_text(f"调试像素失败: {str(e)}")
     
-    def _update_game_window_display(self):
-        """更新游戏窗口和绘画区域显示"""
+
+    
+    def _update_draw_area_display(self):
+        """更新绘画区域显示"""
         try:
-            # 更新游戏窗口显示（只在checkbox选中时）
-            game_window_pos = self.business.get_game_window_position()
-            if game_window_pos:
-                pos, size = game_window_pos
-                self.ui.show_game_window_position(pos, size)
-                logging.info(f"游戏窗口显示已更新: 位置{pos}, 大小{size}")
-            
-            # 更新绘画区域显示（总是显示）
+            # 更新绘画区域显示
             draw_area_pos = self.business.get_draw_area_position()
             if draw_area_pos:
                 self.ui.show_draw_area_position(draw_area_pos[:2], draw_area_pos[2:])
                 logging.info(f"绘画区域显示已更新: 位置{draw_area_pos[:2]}, 大小: {draw_area_pos[2:]}")
         except Exception as e:
-            logging.error(f"更新游戏窗口和绘画区域显示失败: {e}")
+            logging.error(f"更新绘画区域显示失败: {e}")
     
 
     
@@ -339,6 +364,10 @@ class PaintAppController(QObject):
             )
             
             if file_path:
+                # 重置图片相关的数据和状态
+                self._reset_image_related_data()
+                
+                # 设置新选择的图片
                 self.business.set_selected_image(file_path)
                 self.ui.set_selected_image(file_path)  # 同时更新UI状态
                 logging.info(f"图片已选择: {file_path}")
@@ -348,6 +377,31 @@ class PaintAppController(QObject):
         except Exception as e:
             logging.error(f"选择图片失败: {e}")
             self.ui.update_status_text(f"选择图片失败: {str(e)}")
+    
+    def _reset_image_related_data(self):
+        """重置图片相关的数据和状态，保留用户配置"""
+        try:
+            logging.info("重置图片相关的数据和状态")
+            
+            # 重置business中的图片相关数据
+            self.business.reset_image_related_data()
+            
+            # 重置UI中的图片相关数据
+            self.ui.reset_image_related_data()
+            
+            # 停止正在进行的绘图
+            if self.drawing_worker and self.drawing_worker.isRunning():
+                logging.info("停止正在进行的绘图")
+                self._on_stop_drawing()
+            
+            # 更新UI状态
+            self.ui.update_status_text("图片相关数据已重置，请重新处理图片")
+            
+            logging.info("图片相关数据重置完成")
+            
+        except Exception as e:
+            logging.error(f"重置图片相关数据失败: {e}")
+            self.ui.update_status_text(f"重置图片相关数据失败: {str(e)}")
     
     def _on_process_image(self, aspect_ratio, pixel_count):
         """处理图片处理请求"""
@@ -468,6 +522,9 @@ class PaintAppController(QObject):
             # 显示颜色统计信息给用户
             self.ui.update_status_text(f"准备绘图：共{len(collected_colors)}种颜色，其中{len(child_colors)}种子级颜色将用于绘图")
             
+            # 设置进度条最大值
+            self.ui.set_progress_bar_max(len(pixel_info_list))
+            
             if not pixel_info_list:
                 self.ui.update_status_text("像素信息未准备好，请重新处理图片")
                 logging.debug("像素信息未准备好")
@@ -481,6 +538,10 @@ class PaintAppController(QObject):
             # 获取延迟配置
             delay_settings = self.ui.get_delay_settings()
             logging.debug(f"延迟配置: {delay_settings}")
+            
+            # 获取连画模式设置
+            continuous_drawing_enabled = self.ui.get_continuous_drawing_enabled()
+            logging.debug(f"连画模式: {'启用' if continuous_drawing_enabled else '禁用'}")
             
             # 获取按钮位置信息
             palette_button_pos = self.business.get_color_palette_button_position()
@@ -497,10 +558,12 @@ class PaintAppController(QObject):
                 collected_colors, 
                 draw_area_pos,
                 palette_button_pos=palette_button_pos,
-                return_button_pos=return_button_pos
+                return_button_pos=return_button_pos,
+                continuous_drawing=continuous_drawing_enabled
             )
             
             # 设置延迟配置
+            logging.info(f"从UI获取的延迟设置: {delay_settings}")
             self.drawing_worker.set_click_delays(
                 color_delay=delay_settings['color_delay'],
                 draw_delay=delay_settings['draw_delay'],
@@ -508,7 +571,7 @@ class PaintAppController(QObject):
             )
             
             # 连接信号
-            self.drawing_worker.progress_updated.connect(self.ui.update_drawing_progress)
+            self.drawing_worker.progress_updated.connect(self.ui.update_progress_bar)
             self.drawing_worker.status_updated.connect(self.ui.update_status_text)
             self.drawing_worker.drawing_completed.connect(self._on_drawing_completed)
             self.drawing_worker.drawing_error.connect(self._on_drawing_error)
@@ -523,7 +586,6 @@ class PaintAppController(QObject):
             self.ui.update_status_text(f"绘图已开始！使用{len(child_colors)}种子级颜色进行绘图")
             logging.info(f"绘图已开始，使用{len(child_colors)}种子级颜色")
             logging.debug("绘图启动完成")
-            
         except Exception as e:
             logging.error(f"启动绘图失败: {e}")
             import traceback
@@ -564,6 +626,9 @@ class PaintAppController(QObject):
             self.ui.set_drawing_button_enabled(True)
             self.ui.update_status_text("绘图完成！")
             
+            # 重置进度条
+            self.ui.reset_progress_bar()
+            
             # 清理工作线程
             if self.drawing_worker:
                 self.drawing_worker = None
@@ -586,6 +651,9 @@ class PaintAppController(QObject):
             self.ui.set_drawing_button_text("开始绘图")
             self.ui.set_drawing_button_enabled(True)
             self.ui.update_status_text(f"绘图错误: {error_msg}")
+            
+            # 重置进度条
+            self.ui.reset_progress_bar()
             
             # 清理工作线程
             if self.drawing_worker:
@@ -690,8 +758,8 @@ class PaintAppController(QObject):
                 self._update_ui_from_config()
                 # 设置配置名称到输入框
                 self.ui.set_config_name(config_name)
-                # 更新游戏窗口显示
-                self._update_game_window_display()
+                # 更新绘画区域显示
+                self._update_draw_area_display()
             else:
                 from PyQt5.QtWidgets import QMessageBox
                 QMessageBox.warning(self.ui, '加载配置', '配置加载失败，请检查配置文件')
@@ -795,8 +863,8 @@ class PaintAppController(QObject):
             # 清空UI中的图片显示，确保用户重新选择图片
             self.ui.set_selected_image(None)
             
-            # 更新游戏窗口和绘画区域显示
-            self._update_game_window_display()
+            # 更新绘画区域显示
+            self._update_draw_area_display()
             
             logging.info("UI状态从配置更新完成")
             
@@ -867,7 +935,7 @@ if __name__ == "__main__":
         # 检查管理员权限
         if not isAdmin.is_admin():
             logging.info("正在请求管理员权限...")
-            # 确保日志写入到文件
+            # 关闭日志文件句柄，避免权限冲突
             logging.shutdown()
             isAdmin.run_as_admin()
             sys.exit(0)  # 退出当前进程，等待管理员权限重启
