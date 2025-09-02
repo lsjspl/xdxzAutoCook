@@ -117,6 +117,9 @@ class PaintAppController(QObject):
         try:
             from screen_cropper import crop_screen_region, crop_point_region
             
+            # 清除之前的绘画区域显示
+            self._clear_draw_area_display()
+            
             def on_crop_finished(img, position):
                 if img and position:
                     self.business.set_draw_area(position)
@@ -349,6 +352,16 @@ class PaintAppController(QObject):
         except Exception as e:
             logging.error(f"更新绘画区域显示失败: {e}")
     
+    def _clear_draw_area_display(self):
+        """清除绘画区域显示"""
+        try:
+            # 清除绘画区域显示
+            if hasattr(self.ui, 'detection_overlay') and self.ui.detection_overlay:
+                self.ui.detection_overlay.show_draw_area_overlay(False)
+                logging.info("绘画区域显示已清除")
+        except Exception as e:
+            logging.error(f"清除绘画区域显示失败: {e}")
+    
 
     
     def _on_select_image(self):
@@ -403,10 +416,10 @@ class PaintAppController(QObject):
             logging.error(f"重置图片相关数据失败: {e}")
             self.ui.update_status_text(f"重置图片相关数据失败: {str(e)}")
     
-    def _on_process_image(self, aspect_ratio, pixel_count):
+    def _on_process_image(self, aspect_ratio, size_text):
         """处理图片处理请求"""
         try:
-            success = self.business.process_image(aspect_ratio, pixel_count)
+            success = self.business.process_image(aspect_ratio, size_text)
             if success:
                 self.ui.update_status_text("图片处理完成")
                 # 检查是否可以开始绘图
@@ -539,10 +552,7 @@ class PaintAppController(QObject):
             delay_settings = self.ui.get_delay_settings()
             logging.debug(f"延迟配置: {delay_settings}")
             
-            # 获取连画模式设置
-            continuous_drawing_enabled = self.ui.get_continuous_drawing_enabled()
-            logging.debug(f"连画模式: {'启用' if continuous_drawing_enabled else '禁用'}")
-            
+
             # 获取按钮位置信息
             palette_button_pos = self.business.get_color_palette_button_position()
             return_button_pos = self.business.get_color_swatch_return_button_position()
@@ -558,8 +568,7 @@ class PaintAppController(QObject):
                 collected_colors, 
                 draw_area_pos,
                 palette_button_pos=palette_button_pos,
-                return_button_pos=return_button_pos,
-                continuous_drawing=continuous_drawing_enabled
+                return_button_pos=return_button_pos
             )
             
             # 设置延迟配置
@@ -725,8 +734,11 @@ class PaintAppController(QObject):
                 QMessageBox.warning(self.ui, '保存配置', error_msg)
                 return
             
+            # 获取当前的比例和尺寸设置
+            aspect_ratio_and_size = self.ui.get_aspect_ratio_and_size()
+            
             # 保存配置
-            success = self.business.save_config(config_name)
+            success = self.business.save_config(config_name, aspect_ratio_and_size)
             if success:
                 # 保存完成后重新加载配置列表
                 self._load_config_list()
@@ -854,6 +866,22 @@ class PaintAppController(QObject):
             collected_colors = self.business.get_collected_colors()
             if collected_colors:
                 self.ui.set_collected_colors(collected_colors)
+            
+            # 恢复比例和尺寸设置
+            aspect_ratio_and_size = self.business.get_aspect_ratio_and_size()
+            if aspect_ratio_and_size:
+                aspect_ratio = aspect_ratio_and_size.get('aspect_ratio')
+                size = aspect_ratio_and_size.get('size')
+                if aspect_ratio and size:
+                    success = self.ui.set_aspect_ratio_and_size(aspect_ratio, size)
+                    if success:
+                        logging.info(f"已恢复比例和尺寸设置: {aspect_ratio}, {size}")
+                    else:
+                        logging.warning(f"恢复比例和尺寸设置失败: {aspect_ratio}, {size}")
+                else:
+                    logging.warning(f"配置中的比例和尺寸信息不完整: {aspect_ratio_and_size}")
+            else:
+                logging.info("配置中没有比例和尺寸信息")
             
             # 注意：不再从配置中恢复图片路径，用户需要重新选择图片
             # selected_image_path = self.business.get_selected_image_path()

@@ -96,20 +96,27 @@ def setup_logging():
 
 
 def pil_to_qpixmap(pil_img):
-    """Convert PIL image to QPixmap."""
-    if pil_img.mode == "RGBA":
-        img_format = QImage.Format_ARGB32
-    elif pil_img.mode == "RGB":
-        img_format = QImage.Format_RGB888
-    else:
-        pil_img = pil_img.convert("RGB")
-        img_format = QImage.Format_RGB888
-    
+    """Convert PIL image to QPixmap with explicit stride and correct channel order."""
+    # 统一为RGBA或RGB
+    if pil_img.mode not in ("RGB", "RGBA"):
+        try:
+            pil_img = pil_img.convert("RGBA")
+        except Exception:
+            pil_img = pil_img.convert("RGB")
+
     w, h = pil_img.size
-    qimg = QImage(pil_img.tobytes(), w, h, img_format)
-    # 移除rgbSwapped()调用，避免颜色通道错误交换
-    # if pil_img.mode == "RGB":
-    #     qimg = qimg.rgbSwapped()
+    mode = pil_img.mode
+    data = pil_img.tobytes("raw", mode)
+
+    if mode == "RGBA":
+        fmt = QImage.Format_RGBA8888  # 与PIL RGBA顺序一致
+        bytes_per_line = 4 * w
+    else:  # RGB
+        fmt = QImage.Format_RGB888
+        bytes_per_line = 3 * w
+
+    # 显式提供bytesPerLine，并复制数据以避免悬挂指针
+    qimg = QImage(data, w, h, bytes_per_line, fmt).copy()
     return QPixmap.fromImage(qimg)
 
 
@@ -126,7 +133,7 @@ class PaintMainUI(QWidget):
     collect_colors_requested = pyqtSignal()  # 收集颜色请求
     clear_colors_requested = pyqtSignal()  # 清理颜色请求
     select_image_requested = pyqtSignal()  # 选择图片请求
-    process_image_requested = pyqtSignal(str, int)  # 处理图片请求(比例, 像素数量)
+    process_image_requested = pyqtSignal(str, str)  # 处理图片请求(比例, 尺寸)
     start_drawing_requested = pyqtSignal()  # 开始绘图请求
     stop_drawing_requested = pyqtSignal()  # 停止绘图请求
     debug_pixels_requested = pyqtSignal()  # 调试像素请求
@@ -361,11 +368,16 @@ class PaintMainUI(QWidget):
         self.aspect_ratio_combo.addItems(["1:1", "16:9", "4:3", "3:4", "9:16"])
         self.aspect_ratio_combo.setCurrentText("1:1")
         
-        # 像素数量设置
-        self.pixel_count_spin = QSpinBox()
-        self.pixel_count_spin.setRange(10, 500)
-        self.pixel_count_spin.setValue(100)
-        self.pixel_count_spin.setSuffix(" 像素")
+        # 尺寸选择
+        self.size_combo = QComboBox()
+        self.size_combo.addItems(["30个格子", "50个格子", "100个格子", "150个格子"])
+        self.size_combo.setCurrentText("100个格子")
+        
+        # 连接比例变化事件，更新尺寸选项
+        self.aspect_ratio_combo.currentTextChanged.connect(self.update_size_options)
+        
+        # 初始化尺寸选项
+        self.update_size_options()
         
         # 延迟配置设置
         self.color_delay_spin = QDoubleSpinBox()
@@ -377,7 +389,7 @@ class PaintMainUI(QWidget):
         
         self.draw_delay_spin = QDoubleSpinBox()
         self.draw_delay_spin.setRange(0.001, 10.0)
-        self.draw_delay_spin.setValue(0.101)
+        self.draw_delay_spin.setValue(0.011)
         self.draw_delay_spin.setSingleStep(0.001)
         self.draw_delay_spin.setSuffix(" 秒")
         self.draw_delay_spin.setDecimals(5)
@@ -388,12 +400,6 @@ class PaintMainUI(QWidget):
         self.move_delay_spin.setSingleStep(0.001)
         self.move_delay_spin.setSuffix(" 秒")
         self.move_delay_spin.setDecimals(5)
-
-        # 连画模式设置
-        self.continuous_drawing_checkbox = QCheckBox("启用连画模式")
-        self.continuous_drawing_checkbox.setToolTip("勾选后，连续像素将瞬间拖动绘制（从开始到结束一瞬间完成），大幅提高绘画效率")
-        self.continuous_drawing_checkbox.setChecked(True)  # 默认启用
-        
 
 
         # 处理图片按钮
@@ -420,11 +426,10 @@ class PaintMainUI(QWidget):
         step3_layout.addRow("选择图片:", self.select_image_btn)
         step3_layout.addRow("图片路径:", self.image_path_label)
         step3_layout.addRow("图片比例:", self.aspect_ratio_combo)
-        step3_layout.addRow("横向像素数:", self.pixel_count_spin)
+        step3_layout.addRow("尺寸选择:", self.size_combo)
         step3_layout.addRow("颜色点击延迟:", self.color_delay_spin)
         step3_layout.addRow("绘图点击延迟:", self.draw_delay_spin)
         step3_layout.addRow("鼠标移动延迟:", self.move_delay_spin)
-        step3_layout.addRow("", self.continuous_drawing_checkbox)  # 空标签，复选框独占一行
         step3_layout.addRow("处理图片:", self.process_image_btn)
         step3_group.setLayout(step3_layout)
         
@@ -482,37 +487,6 @@ class PaintMainUI(QWidget):
         
         step4_layout.addLayout(drawing_buttons_layout)
         step4_group.setLayout(step4_layout)
-        
-        # 绘图进度显示
-        progress_group = QGroupBox("绘图进度")
-        progress_layout = QVBoxLayout()
-        
-        # 进度条
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setMinimumHeight(25)
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setFormat("进度: %p% (%v/%m)")
-        
-        # 进度标签
-        self.progress_label = QLabel("等待开始绘图...")
-        self.progress_label.setStyleSheet("color: #666; font-size: 12px;")
-        
-        progress_layout.addWidget(self.progress_bar)
-        progress_layout.addWidget(self.progress_label)
-        progress_group.setLayout(progress_layout)
-        
-        # 状态显示
-        status_group = QGroupBox("状态信息")
-        status_layout = QVBoxLayout()
-        
-        self.status_text = QTextEdit()
-        self.status_text.setMaximumHeight(150)
-        self.status_text.setReadOnly(True)
-        self.status_text.append("绘图助手已启动，请按步骤操作...")
-        
-        status_layout.addWidget(self.status_text)
-        status_group.setLayout(status_layout)
         
         # 配置管理组
         config_group = QGroupBox("配置管理")
@@ -575,10 +549,8 @@ class PaintMainUI(QWidget):
         layout.addWidget(step2_group)
         layout.addWidget(step3_group)
         layout.addWidget(step4_group)
-        layout.addWidget(progress_group)
         layout.addWidget(config_group)
         layout.addWidget(draw_area_display_group)
-        layout.addWidget(status_group)
         layout.addStretch()
         
         panel.setLayout(layout)
@@ -618,6 +590,8 @@ class PaintMainUI(QWidget):
         self.pixelized_image_label.setAlignment(Qt.AlignCenter)
         self.pixelized_image_label.setMinimumHeight(200)
         self.pixelized_image_label.setMinimumWidth(300)
+        self.pixelized_image_label.setScaledContents(False)  # 禁用自动拉伸
+        self.pixelized_image_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)  # 允许自由调整大小
         self.pixelized_image_label.setStyleSheet("""
             QLabel {
                 border: 2px dashed #cccccc;
@@ -638,7 +612,7 @@ class PaintMainUI(QWidget):
         
         # 创建滚动区域
         self.collected_colors_scroll = QScrollArea()
-        self.collected_colors_scroll.setMinimumHeight(200)
+        self.collected_colors_scroll.setMinimumHeight(100)
         self.collected_colors_scroll.setWidgetResizable(True)
         self.collected_colors_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.collected_colors_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -671,9 +645,42 @@ class PaintMainUI(QWidget):
         collected_colors_layout.addWidget(self.collected_colors_scroll)
         collected_colors_group.setLayout(collected_colors_layout)
         
+        # 绘图进度显示
+        progress_group = QGroupBox("绘图进度")
+        progress_layout = QVBoxLayout()
+        
+        # 进度条
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setMinimumHeight(25)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("进度: %p% (%v/%m)")
+        
+        # 进度标签
+        self.progress_label = QLabel("等待开始绘图...")
+        self.progress_label.setStyleSheet("color: #666; font-size: 12px;")
+        
+        progress_layout.addWidget(self.progress_bar)
+        progress_layout.addWidget(self.progress_label)
+        progress_group.setLayout(progress_layout)
+        
+        # 状态显示
+        status_group = QGroupBox("状态信息")
+        status_layout = QVBoxLayout()
+        
+        self.status_text = QTextEdit()
+        self.status_text.setMaximumHeight(150)
+        self.status_text.setReadOnly(True)
+        self.status_text.append("绘图助手已启动，请按步骤操作...")
+        
+        status_layout.addWidget(self.status_text)
+        status_group.setLayout(status_layout)
+        
         # 添加所有组件到面板
         layout.addLayout(image_preview_layout)  # 添加图片预览行
         layout.addWidget(collected_colors_group)
+        layout.addWidget(progress_group)
+        layout.addWidget(status_group)
         
         panel.setLayout(layout)
         return panel
@@ -701,7 +708,7 @@ class PaintMainUI(QWidget):
         
         # 设置变化时的处理
         self.aspect_ratio_combo.currentTextChanged.connect(self.on_settings_changed)
-        self.pixel_count_spin.valueChanged.connect(self.on_settings_changed)
+        self.size_combo.currentTextChanged.connect(self.on_settings_changed)
     
     def on_settings_changed(self):
         """设置变化时的处理"""
@@ -712,9 +719,9 @@ class PaintMainUI(QWidget):
         """处理图片按钮点击事件"""
         if self.selected_image_path:
             ratio_text = self.aspect_ratio_combo.currentText()
-            pixel_count = self.pixel_count_spin.value()
-            self.process_image_requested.emit(ratio_text, pixel_count)
-            self.update_status_text(f"开始处理图片，比例: {ratio_text}, 像素数: {pixel_count}")
+            size_text = self.size_combo.currentText()
+            self.process_image_requested.emit(ratio_text, size_text)
+            self.update_status_text(f"开始处理图片，比例: {ratio_text}, 尺寸: {size_text}")
     
     def set_draw_area(self, position):
         """设置绘画区域"""
@@ -879,13 +886,16 @@ class PaintMainUI(QWidget):
         self.check_ready_state()
     
     def display_original_image(self, image_path):
-        """显示原图预览"""
+        """显示原图预览（使用Qt内置方法）"""
         try:
-            image = Image.open(image_path)
-            # 缩放图片以适应预览区域
-            image.thumbnail((300, 200), Image.Resampling.LANCZOS)
-            pixmap = pil_to_qpixmap(image)
-            self.original_image_label.setPixmap(pixmap)
+            pixmap = QPixmap(image_path)
+            if pixmap.isNull():
+                raise Exception("无法加载图片")
+            # 按比例缩放至预览区域大小
+            target_w, target_h = 300, 200
+            scaled = pixmap.scaled(target_w, target_h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.original_image_label.setPixmap(scaled)
+            self.original_image_label.setAlignment(Qt.AlignCenter)
             self.original_image_label.setText("")
         except Exception as e:
             logging.error(f"显示原图预览失败: {e}")
@@ -895,9 +905,24 @@ class PaintMainUI(QWidget):
         """显示像素化图片预览"""
         try:
             self.pixelized_image = pixelized_image
-            # 放大像素化图片以便查看
-            display_image = pixelized_image.resize((300, 300), Image.NEAREST)
+            
+            # 计算等比例缩放的尺寸，保持原始比例
+            original_width, original_height = pixelized_image.size
+            max_display_size = 300  # 最大显示尺寸
+            
+            # 计算缩放比例，保持宽高比
+            scale_ratio = min(max_display_size / original_width, max_display_size / original_height)
+            
+            # 计算新的尺寸
+            new_width = int(original_width * scale_ratio)
+            new_height = int(original_height * scale_ratio)
+            
+            # 使用NEAREST插值保持像素化效果，等比例缩放
+            display_image = pixelized_image.resize((new_width, new_height), Image.NEAREST)
             pixmap = pil_to_qpixmap(display_image)
+            
+            # 设置QLabel的固定尺寸以匹配图片尺寸，防止拉伸
+            self.pixelized_image_label.setFixedSize(new_width, new_height)
             self.pixelized_image_label.setPixmap(pixmap)
             self.pixelized_image_label.setText("")
             self.update_status_text("图片像素化完成")
@@ -1124,9 +1149,101 @@ class PaintMainUI(QWidget):
         }
         return ratio_map.get(ratio_text, (1, 1))
     
-    def get_pixel_count(self):
-        """获取横向像素数量"""
-        return self.pixel_count_spin.value()
+    def update_size_options(self):
+        """根据比例更新尺寸选项"""
+        ratio = self.aspect_ratio_combo.currentText()
+        
+        # 根据比例设置不同的尺寸选项
+        if ratio in ["16:9", "4:3", "1:1"]:
+            # 16:9, 4:3, 1:1 使用相同的尺寸选项
+            sizes = ["30个格子", "50个格子", "100个格子", "150个格子"]
+        elif ratio == "3:4":
+            # 3:4 使用不同的尺寸选项
+            sizes = ["24个格子", "38个格子", "76个格子", "114个格子"]
+        elif ratio == "9:16":
+            # 9:16 使用不同的尺寸选项
+            sizes = ["18个格子", "28个格子", "56个格子", "84个格子"]
+        else:
+            # 默认选项
+            sizes = ["30个格子", "50个格子", "100个格子", "150个格子"]
+        
+        # 保存当前选择
+        current_text = self.size_combo.currentText()
+        
+        # 更新选项
+        self.size_combo.clear()
+        self.size_combo.addItems(sizes)
+        
+        # 尝试恢复之前的选择，如果不存在则选择第一个
+        if current_text in sizes:
+            self.size_combo.setCurrentText(current_text)
+        else:
+            self.size_combo.setCurrentIndex(0)
+    
+    def get_size_info(self):
+        """获取当前选择的尺寸信息"""
+        ratio_text = self.aspect_ratio_combo.currentText()
+        size_text = self.size_combo.currentText()
+        
+        # 从尺寸文本中提取数字
+        import re
+        size_match = re.search(r'(\d+)个格子', size_text)
+        if size_match:
+            grid_count = int(size_match.group(1))
+        else:
+            grid_count = 100  # 默认值
+        
+        return ratio_text, size_text, grid_count
+    
+    def get_aspect_ratio_and_size(self):
+        """获取当前选择的比例和尺寸信息（用于配置保存）"""
+        return {
+            'aspect_ratio': self.aspect_ratio_combo.currentText(),
+            'size': self.size_combo.currentText()
+        }
+    
+    def set_aspect_ratio_and_size(self, aspect_ratio, size):
+        """设置比例和尺寸（用于配置加载）"""
+        try:
+            logging.info(f"开始设置比例和尺寸: {aspect_ratio}, {size}")
+            
+            # 设置比例
+            if aspect_ratio and aspect_ratio in ["1:1", "16:9", "4:3", "3:4", "9:16"]:
+                logging.info(f"设置比例下拉框为: {aspect_ratio}")
+                self.aspect_ratio_combo.setCurrentText(aspect_ratio)
+                # 比例改变会自动更新尺寸选项
+                
+                # 等待一下让尺寸选项更新
+                import time
+                time.sleep(0.1)
+                
+                # 设置尺寸
+                if size:
+                    logging.info(f"设置尺寸下拉框为: {size}")
+                    # 检查尺寸选项是否可用
+                    available_sizes = [self.size_combo.itemText(i) for i in range(self.size_combo.count())]
+                    logging.info(f"当前可用的尺寸选项: {available_sizes}")
+                    
+                    if size in available_sizes:
+                        self.size_combo.setCurrentText(size)
+                        logging.info(f"成功设置尺寸: {size}")
+                    else:
+                        logging.warning(f"尺寸选项 '{size}' 不在可用选项中: {available_sizes}")
+                        # 尝试设置第一个可用选项
+                        if available_sizes:
+                            self.size_combo.setCurrentIndex(0)
+                            logging.info(f"设置默认尺寸: {available_sizes[0]}")
+                    
+                logging.info(f"已设置比例: {aspect_ratio}, 尺寸: {size}")
+                return True
+            else:
+                logging.warning(f"无效的比例设置: {aspect_ratio}")
+                return False
+        except Exception as e:
+            logging.error(f"设置比例和尺寸失败: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            return False
     
     def update_status_text(self, text):
         """更新状态文本"""
@@ -1614,10 +1731,6 @@ class PaintMainUI(QWidget):
             'move_delay': self.move_delay_spin.value()
         }
     
-    def get_continuous_drawing_enabled(self):
-        """获取连画模式是否启用"""
-        return self.continuous_drawing_checkbox.isChecked()
-    
 
     
     # 配置管理方法
@@ -1765,8 +1878,8 @@ class DetectionOverlay(QWidget):
             x, y = self.draw_area_pos
             width, height = self.draw_area_size
             
-            # 绘制绿色方框
-            pen = QPen(QColor(0, 255, 0), 3)  # 绿色，3像素宽度
+            # 绘制绿色方框 - 更细更透明
+            pen = QPen(QColor(76, 175, 80, 200), 1)  # 绿色，1像素宽度，半透明
             painter.setPen(pen)
             painter.drawRect(x, y, width, height)
             

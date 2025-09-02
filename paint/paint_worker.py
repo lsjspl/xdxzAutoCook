@@ -28,7 +28,7 @@ class DrawingWorker(QThread):
     drawing_completed = pyqtSignal()  # 绘图完成
     drawing_error = pyqtSignal(str)  # 绘图错误
     
-    def __init__(self, pixel_info_list=None, collected_colors=None, draw_area_pos=None, palette_button_pos=None, return_button_pos=None, is_debug_mode=False, continuous_drawing=False):
+    def __init__(self, pixel_info_list=None, collected_colors=None, draw_area_pos=None, palette_button_pos=None, return_button_pos=None, is_debug_mode=False):
         super().__init__()
         
         self.pixel_info_list = pixel_info_list or []
@@ -37,13 +37,6 @@ class DrawingWorker(QThread):
         self.palette_button_pos = palette_button_pos
         self.return_button_pos = return_button_pos
         self.is_debug_mode = is_debug_mode
-        self.continuous_drawing = continuous_drawing  # 连画模式标志
-        
-        # 记录连画模式状态
-        if self.continuous_drawing:
-            logging.info("连画模式已启用：连续像素将瞬间完成绘制")
-        else:
-            logging.info("连画模式已禁用：每个像素将单独点击")
         
         # 重要：只使用子级颜色，过滤掉父级颜色
         child_colors = [color_info for color_info in self.collected_colors if not color_info.get('is_parent', False)]
@@ -188,12 +181,8 @@ class DrawingWorker(QThread):
                     continue
                 
                 # 绘制该颜色的所有像素点
-                if self.continuous_drawing:
-                    # 连画模式：将连续像素分组，使用拖动方式绘制
-                    processed_pixels += self._draw_pixels_continuous(pixel_positions, total_pixels)
-                else:
-                    # 传统模式：逐个点击像素
-                    processed_pixels += self._draw_pixels_individual(pixel_positions, total_pixels)
+                # 逐个点击像素
+                processed_pixels += self._draw_pixels_individual(pixel_positions, total_pixels)
                 
                 # 完成当前颜色的绘制后，返回到父颜色区域
                 if not self.should_stop:
@@ -387,195 +376,7 @@ class DrawingWorker(QThread):
         
         return processed_pixels
     
-    def _draw_pixels_continuous(self, pixel_positions, total_pixels):
-        """连画模式：相同颜色的连续格子，用一次拖动完成"""
-        import time
-        from click_utils import drag_draw_line
-        
-        start_time = time.time()
-        processed_pixels = 0
-        
-        logging.info(f"开始连画模式 - {time.strftime('%Y-%m-%d %H:%M:%S')}")
-        
-        # 重新构建像素信息，包含颜色信息
-        pixel_info_map = {}
-        for pixel_info in self.pixel_info_list:
-            pos = pixel_info['position']
-            color = pixel_info['color']
-            pixel_info_map[pos] = color
-        
-        # 按行分组，每行按颜色分组
-        rows = {}
-        for pos in pixel_positions:
-            x, y = pos
-            color = pixel_info_map.get(pos)
-            if color is None:
-                logging.warning(f"像素位置{pos}没有颜色信息，跳过")
-                continue
-                
-            if y not in rows:
-                rows[y] = {}
-            if color not in rows[y]:
-                rows[y][color] = []
-            rows[y][color].append(x)
-        
-        # 统计信息
-        total_rows = len(rows)
-        total_segments = 0
-        for y in rows:
-            for color in rows[y]:
-                x_coords = sorted(rows[y][color])
-                if not x_coords:
-                    continue
-                
-                # 找出连续段
-                segments = []
-                current_segment = [x_coords[0]]
-                for i in range(1, len(x_coords)):
-                    # 计算像素间隔
-                    gap = x_coords[i] - current_segment[-1]
-                    
-                    # 如果间隔小于等于6，认为是连续的（考虑像素化时的浮点误差）
-                    if gap <= 6:
-                        current_segment.append(x_coords[i])
-                    else:
-                        # 间隔太大，开始新段
-                        if current_segment:
-                            segments.append(current_segment)
-                        current_segment = [x_coords[i]]
-                # 保存最后一个段
-                if current_segment:
-                    segments.append(current_segment)
-                
-                total_segments += len(segments)
-        
-        logging.info(f"连画模式统计：共{total_rows}行，{total_segments}个连续段，{len(pixel_positions)}个像素")
-        logging.info(f"连画模式：相同颜色的连续格子，用一次拖动完成（容差=6像素）")
-        
-        # 重置进度条
-        self.progress_updated.emit(0, total_pixels)
-        
-        # 验证像素覆盖
-        total_processed = 0
-        for y in rows:
-            for color in rows[y]:
-                x_coords = sorted(rows[y][color])
-                total_processed += len(x_coords)
-        
-        if total_processed != len(pixel_positions):
-            logging.warning(f"像素数量不匹配：处理了{total_processed}个，原始{len(pixel_positions)}个")
-        else:
-            logging.info(f"像素数量验证通过：{total_processed}个像素")
-        
-        # 对每行处理
-        for y in sorted(rows.keys()):
-            if self.should_stop:
-                break
-                
-            logging.info(f"处理行{y}，共{len(rows[y])}种颜色")
-            
-            # 对每个颜色处理
-            for color in rows[y]:
-                if self.should_stop:
-                    break
-                    
-                x_coords = sorted(rows[y][color])
-                if not x_coords:
-                    continue
-                
-                # 调试：显示像素间隔分布
-                if len(x_coords) > 1:
-                    gaps = [x_coords[i] - x_coords[i-1] for i in range(1, min(10, len(x_coords)))]
-                    logging.debug(f"行{y}颜色{color}像素间隔：{gaps}...")
-                
-                # 找出这一行这个颜色的连续段
-                segments = []
-                current_segment = [x_coords[0]]
-                for i in range(1, len(x_coords)):
-                    # 计算像素间隔
-                    gap = x_coords[i] - current_segment[-1]
-                    
-                    # 如果间隔小于等于6，认为是连续的（考虑像素化时的浮点误差）
-                    if gap <= 6:
-                        current_segment.append(x_coords[i])
-                    else:
-                        # 间隔太大，开始新段
-                        if current_segment:
-                            segments.append(current_segment)
-                        current_segment = [x_coords[i]]
-                # 保存最后一个段
-                if current_segment:
-                    segments.append(current_segment)
-                
-                # 调试：显示连续段信息
-                if len(segments) > 0:
-                    logging.info(f"行{y}颜色{color}：识别出{len(segments)}个连续段")
-                    for j, seg in enumerate(segments):
-                        if len(seg) > 1:
-                            logging.info(f"  段{j+1}：{len(seg)}个像素，从{seg[0]}到{seg[-1]}")
-                        else:
-                            logging.debug(f"  段{j+1}：单个像素{seg[0]}")
-                
-                # 对每个连续段进行拖动
-                for segment in segments:
-                    if self.should_stop:
-                        break
-                    
-                    logging.info(f"处理段：{len(segment)}个像素，从{segment[0]}到{segment[-1]}")
-                        
-                    if len(segment) == 1:
-                        # 单个像素点击
-                        success = click_position((segment[0], y))
-                        if success:
-                            processed_pixels += 1
-                            logging.debug(f"单个像素点击：({segment[0]}, {y})")
-                    else:
-                        # 连续像素拖动 - 有拖动过程
-                        start_pos = (segment[0], y)
-                        # 根据像素间隔动态调整拖动范围
-                        if len(segment) > 1:
-                            # 计算平均像素间隔
-                            avg_gap = (segment[-1] - segment[0]) / (len(segment) - 1)
-                            # 拖动范围 = 最后一个像素 + 平均间隔
-                            end_pos = (segment[-1] + int(avg_gap), y)
-                        else:
-                            end_pos = (segment[-1] + 3, y)  # 单个像素的情况
-                        
-                        logging.info(f"连画模式：拖动从{start_pos}到{end_pos}，覆盖{len(segment)}个像素")
-                        
-                        # 使用有拖动过程的函数
-                        success = drag_draw_line(start_pos, end_pos, steps=10)
-                        if success:
-                            processed_pixels += len(segment)
-                            logging.info(f"连画成功：行{y}，{len(segment)}个像素，从{start_pos}到{end_pos}")
-                        else:
-                            logging.warning(f"连画失败，回退到逐个点击：{len(segment)}个像素")
-                            # 失败则逐个点击
-                            for x in segment:
-                                if click_position((x, y)):
-                                    processed_pixels += 1
-                    
-                    # 无延迟
-                    if self.should_stop:
-                        break
-                    
-                    # 更新进度（每次处理像素后都更新）
-                    self.progress_updated.emit(processed_pixels, total_pixels)
-                    
-                    # 每5个像素输出一次进度（更频繁的更新）
-                    if processed_pixels % 5 == 0:
-                        progress_percent = processed_pixels / total_pixels * 100
-                        self.status_updated.emit(f"连画进度: {processed_pixels}/{total_pixels} ({progress_percent:.1f}%)")
-                        logging.info(f"连画进度: {processed_pixels}/{total_pixels} ({progress_percent:.1f}%)")
-        
-        end_time = time.time()
-        total_time = end_time - start_time
-        logging.info(f"连画模式完成 - 耗时：{total_time:.2f}秒，处理了{processed_pixels}个像素")
-        
-        return processed_pixels
-    
 
-    
     def _get_color_info(self, color_index):
         """获取颜色的完整信息"""
         try:

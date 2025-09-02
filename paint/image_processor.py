@@ -5,6 +5,7 @@
 """
 
 import logging
+import os
 import numpy as np
 from PIL import Image, ImageDraw
 from sklearn.cluster import KMeans
@@ -268,144 +269,136 @@ class ImageProcessor:
     
     def get_pixel_positions(self, draw_area_pos, pixel_image, pixel_size):
         """
-        获取每个像素块在绘画区域中的位置和颜色
+        获取每个像素块在绘画区域中的位置和颜色（简化累加版）
+        
+        思路：
+        - 从左下角格子的中心点开始计算
+        - 其他格子的坐标通过累加格子尺寸得到
+        - 使用简单的浮点计算，避免复杂的整数分配
+        - 确保每个格子都有合理的尺寸，避免空行
         
         Args:
-            draw_area_pos: 绘画区域位置 (x, y, width, height)
-            pixel_image: 像素化图片
+            draw_area_pos: (x, y, width, height)
+            pixel_image: 像素化后的 PIL Image
             pixel_size: 像素块尺寸 (width, height)
         
         Returns:
-            list: 像素信息列表 [{'position': (x, y), 'color': (r, g, b)}, ...]
+            list[dict]: [{'position': (x, y), 'color': (r,g,b), 'grid_pos': (gx,gy), 'block_bounds': (left, top, w, h)}]
         """
         try:
             area_x, area_y, area_width, area_height = draw_area_pos
-            block_width, block_height = pixel_size
-            
-            pixel_info = []
             img_width, img_height = pixel_image.size
+
+            if img_width <= 0 or img_height <= 0 or area_width <= 0 or area_height <= 0:
+                logging.error("get_pixel_positions: 输入尺寸非法")
+                return []
+
+            # 计算每个格子的尺寸（使用浮点，更精确）
+            cell_width = area_width / img_width
+            cell_height = area_height / img_height
             
-            # 使用原始的像素块尺寸计算，但保持精确的浮点数计算
-            logging.info(f"像素块尺寸: {block_width:.2f}×{block_height:.2f}")
-            logging.info(f"图片尺寸: {img_width}×{img_height}")
-            logging.info(f"绘画区域: {area_width}×{area_height}")
+            logging.info(f"简化坐标计算: 网格={img_width}x{img_height}, 格子尺寸={cell_width:.2f}x{cell_height:.2f}")
             
-            # 验证计算是否合理
-            total_width = block_width * img_width
-            total_height = block_height * img_height
-            logging.info(f"计算总尺寸: {total_width:.2f}×{total_height:.2f}")
+            # 特别针对竖屏比例添加调试信息
+            if img_height > img_width:  # 竖屏比例
+                logging.info(f"竖屏比例检测: 高度{img_height} > 宽度{img_width}")
+                logging.info(f"格子尺寸: 宽度={cell_width:.2f}, 高度={cell_height:.2f}")
+
+            pixel_info = []
+
+            # 从左下角开始，逐行逐列计算坐标
+            # 使用高精度计算，确保每个格子都能被准确点击
+            # 预计算每行的Y坐标，确保唯一性
+            row_y_coords = []
+            for gy in range(img_height):
+                # 计算每行的Y坐标
+                bottom = area_y + area_height - gy * cell_height
+                top = area_y + area_height - (gy + 1) * cell_height
+                center_y = (top + bottom) / 2.0
+                row_y = int(round(center_y))
+                row_y_coords.append(row_y)
             
-            if total_width > area_width or total_height > area_height:
-                logging.warning(f"像素块尺寸过大，可能导致超出边界！")
-                # 重新计算像素块尺寸以确保完全覆盖
-                block_width = area_width / img_width
-                block_height = area_height / img_height
-                logging.info(f"调整后像素块尺寸: {block_width:.2f}×{block_height:.2f}")
+            # 确保每行的Y坐标都是唯一的
+            for i in range(1, len(row_y_coords)):
+                if row_y_coords[i] == row_y_coords[i-1]:
+                    row_y_coords[i] = row_y_coords[i-1] + 1
+                    logging.warning(f"行{i}Y坐标与上行相同，强制递增到{row_y_coords[i]}")
             
-            # 计算第一个格子的中心点坐标
-            first_center_x = area_x + block_width / 2
-            first_center_y = area_y + block_height / 2
+            logging.info(f"行Y坐标序列: {row_y_coords}")
             
-            logging.info(f"第一个格子中心点: ({first_center_x:.2f}, {first_center_y:.2f})")
-            logging.info(f"格子间距: {block_width:.2f}×{block_height:.2f}")
-            
-            # 验证网格计算
-            expected_total_width = first_center_x + (img_width - 1) * block_width
-            expected_total_height = first_center_y + (img_height - 1) * block_height
-            logging.info(f"预期总宽度: {expected_total_width:.2f} (绘画区域宽度: {area_width})")
-            logging.info(f"预期总高度: {expected_total_height:.2f} (绘画区域高度: {area_height})")
-            
-            # 检查是否超出边界
-            if expected_total_width > area_x + area_width:
-                logging.warning(f"计算的总宽度超出绘画区域边界！")
-            if expected_total_height > area_y + area_height:
-                logging.warning(f"计算的总高度超出绘画区域边界！")
-            
-            for y in range(img_height):
-                for x in range(img_width):
-                    # 获取像素颜色
-                    color = pixel_image.getpixel((x, y))
-                    if isinstance(color, int):  # 灰度图
+            for gy in range(img_height):  # gy: 网格Y坐标，从下到上
+                for gx in range(img_width):  # gx: 网格X坐标，从左到右
+                    
+                    # 使用高精度浮点计算，避免累积误差
+                    # 先计算格子的精确边界
+                    left = area_x + gx * cell_width
+                    right = area_x + (gx + 1) * cell_width
+                    
+                    # 计算格子中心点（使用高精度方法）
+                    center_x = (left + right) / 2.0
+                    
+                    # 使用预计算的Y坐标，确保唯一性，并往下偏移1个像素
+                    final_x = int(round(center_x))
+                    final_y = row_y_coords[gy] + 1
+                    
+                    # 调试信息：记录每行的Y坐标
+                    if gx == 0:  # 每行的第一个点
+                        logging.debug(f"行{gy}: Y坐标={final_y}, X坐标={final_x}")
+                    
+                    # 颜色读取需按图像坐标系翻转Y以保持视觉不倒置
+                    color = pixel_image.getpixel((gx, img_height - 1 - gy))
+                    if isinstance(color, int):
                         color = (color, color, color)
-                    elif len(color) == 4:  # RGBA
-                        color = color[:3]  # 只取RGB
-                    
-                    # 直接计算当前格子的中心点坐标（增量计算）
-                    pixel_x = first_center_x + x * block_width
-                    pixel_y = first_center_y + y * block_height
-                    
-                    # 转换为整数坐标（四舍五入）
-                    pixel_x = int(round(pixel_x))
-                    pixel_y = int(round(pixel_y))
-                    
-                    # 确保像素位置不超出绘图区域边界
-                    pixel_x = min(pixel_x, area_x + area_width - 1)
-                    pixel_y = min(pixel_y, area_y + area_height - 1)
-                    
-                    # 确保位置为有效整数
-                    pixel_x = max(area_x, pixel_x)
-                    pixel_y = max(area_y, pixel_y)
-                    
-                    # 计算像素块的边界信息（用于调试）
-                    pixel_left = area_x + x * block_width
-                    pixel_top = area_y + y * block_height
-                    
+                    elif len(color) == 4:
+                        color = color[:3]
+
                     pixel_info.append({
-                        'position': (pixel_x, pixel_y),
+                        'position': (final_x, final_y),
                         'color': color,
-                        'grid_pos': (x, y),
-                        'block_bounds': (pixel_left, pixel_top, block_width, block_height)
+                        'grid_pos': (gx, gy),
+                        'block_bounds': (int(left), int(top), int(right - left), int(bottom - top))
                     })
-            
-            logging.info(f"生成了{len(pixel_info)}个像素点位置信息")
-            
-            # 验证位置唯一性
+
+            # 验证坐标的唯一性和准确性
             positions = [info['position'] for info in pixel_info]
-            unique_positions = len(set(positions))
-            if unique_positions != len(positions):
-                logging.warning(f"检测到重复位置！总位置数: {len(positions)}, 唯一位置数: {unique_positions}")
-                
-                # 分析重复位置
-                position_counts = {}
-                for pos in positions:
-                    position_counts[pos] = position_counts.get(pos, 0) + 1
-                
-                duplicate_positions = {pos: count for pos, count in position_counts.items() if count > 1}
-                logging.warning(f"重复位置详情: {duplicate_positions}")
-                
-                # 重新计算重复位置
-                pixel_info = self._fix_duplicate_positions(pixel_info, draw_area_pos, actual_block_width, actual_block_height)
-            else:
-                logging.info("所有像素位置都是唯一的")
+            unique_positions = set(positions)
+            if len(positions) != len(unique_positions):
+                logging.warning(f"检测到重复坐标: 总坐标{len(positions)}个，唯一坐标{len(unique_positions)}个")
+                # 找出重复的坐标
+                from collections import Counter
+                position_counts = Counter(positions)
+                duplicates = [(pos, count) for pos, count in position_counts.items() if count > 1]
+                if duplicates:
+                    logging.warning(f"重复坐标详情: {duplicates[:5]}")  # 只显示前5个
             
-            # 验证像素分布
-            grid_positions = [info.get('grid_pos', (0, 0)) for info in pixel_info]
-            x_coords = [pos[0] for pos in grid_positions]
-            y_coords = [pos[1] for pos in grid_positions]
+            # 检查Y坐标的单调性（应该从下到上递减）
+            y_coords = [info['position'][1] for info in pixel_info[0::img_width]]  # 每行首点Y
+            if y_coords != sorted(y_coords, reverse=True):
+                logging.warning("Y坐标不是单调递减的，可能存在空行问题")
+                logging.warning(f"Y坐标序列: {y_coords}")
             
-            logging.info(f"网格坐标范围: X({min(x_coords)}-{max(x_coords)}), Y({min(y_coords)}-{max(y_coords)})")
-            logging.info(f"预期网格尺寸: {img_width}×{img_height}")
+            # 检查X坐标的单调性（应该从左到右递增）
+            x_coords = [info['position'][0] for info in pixel_info[:img_width]]  # 第一行所有X
+            if x_coords != sorted(x_coords):
+                logging.warning("X坐标不是单调递增的，可能存在空列问题")
+                logging.warning(f"X坐标序列: {x_coords}")
             
-            # 检查是否有缺失的行或列
-            expected_x_coords = set(range(img_width))
-            expected_y_coords = set(range(img_height))
-            actual_x_coords = set(x_coords)
-            actual_y_coords = set(y_coords)
-            
-            missing_x = expected_x_coords - actual_x_coords
-            missing_y = expected_y_coords - actual_y_coords
-            
-            if missing_x:
-                logging.warning(f"缺失的X坐标: {sorted(missing_x)}")
-            if missing_y:
-                logging.warning(f"缺失的Y坐标: {sorted(missing_y)}")
-            
+            # 检查坐标范围是否在绘画区域内
+            all_x = [pos[0] for pos in positions]
+            all_y = [pos[1] for pos in positions]
+            if all_x and (min(all_x) < area_x or max(all_x) >= area_x + area_width):
+                logging.warning(f"X坐标超出绘画区域: 范围[{min(all_x)}, {max(all_x)}], 绘画区域[{area_x}, {area_x + area_width})")
+            if all_y and (min(all_y) < area_y or max(all_y) >= area_y + area_height):
+                logging.warning(f"Y坐标超出绘画区域: 范围[{min(all_y)}, {max(all_y)}], 绘画区域[{area_y}, {area_y + area_height})")
+
+            logging.info(f"生成像素点完成：共{len(pixel_info)}个，使用高精度累加算法")
             return pixel_info
-            
+
         except Exception as e:
             logging.error(f"获取像素位置失败: {e}")
             return []
-    
+
+
     def _fix_duplicate_positions(self, pixel_info, draw_area_pos, block_width, block_height):
         """
         修复重复的像素位置

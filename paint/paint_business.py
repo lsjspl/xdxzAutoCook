@@ -68,6 +68,15 @@ class PaintBusiness(QObject):
         
         logging.info("绘图业务逻辑初始化完成")
     
+    def _calculate_pixel_count(self, aspect_ratio_tuple, grid_count):
+        """根据比例和格子数量计算横向像素数"""
+        # 格子数量就是横向像素数
+        pixel_count = grid_count
+        
+        logging.info(f"比例 {aspect_ratio_tuple[0]}:{aspect_ratio_tuple[1]}, 格子数量: {grid_count}, 横向像素数: {pixel_count}")
+        
+        return pixel_count
+    
     def reset_image_related_data(self):
         """重置图片相关的数据，保留用户配置"""
         with self._state_lock:
@@ -610,7 +619,7 @@ class PaintBusiness(QObject):
                 self.pixelized_image = None
                 self.pixel_info_list = []
     
-    def process_image(self, aspect_ratio, pixel_count):
+    def process_image(self, aspect_ratio, size_text):
         """处理图片，进行像素化"""
         try:
             if not self.selected_image_path:
@@ -633,6 +642,18 @@ class PaintBusiness(QObject):
                     return False
             else:
                 aspect_ratio_tuple = aspect_ratio
+            
+            # 从尺寸文本中提取格子数量
+            import re
+            size_match = re.search(r'(\d+)个格子', size_text)
+            if size_match:
+                grid_count = int(size_match.group(1))
+            else:
+                self.status_updated.emit(f"无效的尺寸格式: {size_text}")
+                return False
+            
+            # 根据比例和格子数量计算横向像素数
+            pixel_count = self._calculate_pixel_count(aspect_ratio_tuple, grid_count)
             
             # 从收集到的颜色中提取RGB值作为调色板
             # 重要：只使用子级颜色，过滤掉父级颜色
@@ -781,7 +802,11 @@ class PaintBusiness(QObject):
         
         return result
     
-    def save_config(self, config_name):
+    def get_aspect_ratio_and_size(self):
+        """获取比例和尺寸配置"""
+        return getattr(self, 'aspect_ratio_and_size', None)
+    
+    def save_config(self, config_name, aspect_ratio_and_size=None):
         """保存配置"""
         try:
             config_data = {
@@ -793,8 +818,6 @@ class PaintBusiness(QObject):
                 'child_color_area_pos': self.child_color_area_pos,
                 'background_color_button_pos': self.background_color_button_pos,
                 
-
-                
                 # 延迟配置
                 'color_click_delay': self.color_click_delay,
                 'draw_click_delay': self.draw_click_delay,
@@ -802,6 +825,9 @@ class PaintBusiness(QObject):
                 
                 # 收集到的颜色信息
                 'collected_colors': self.collected_colors,
+                
+                # 图片比例和尺寸配置
+                'aspect_ratio_and_size': aspect_ratio_and_size,
                 
                 # 注意：不保存图片路径和像素化图片，避免配置文件过大和路径依赖问题
                 # 'selected_image_path': self.selected_image_path,  # 已移除
@@ -865,6 +891,13 @@ class PaintBusiness(QObject):
             # 恢复收集到的颜色信息
             if config_data.get('collected_colors'):
                 self.collected_colors = config_data['collected_colors']
+            
+            # 恢复图片比例和尺寸配置
+            aspect_ratio_and_size = config_data.get('aspect_ratio_and_size')
+            if aspect_ratio_and_size:
+                self.aspect_ratio_and_size = aspect_ratio_and_size
+            else:
+                self.aspect_ratio_and_size = None
             
             # 注意：不再从配置中恢复图片路径，用户需要重新选择图片
             # if config_data.get('selected_image_path'):

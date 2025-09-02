@@ -64,7 +64,8 @@ class Cropper(QtWidgets.QWidget):
 
     def paintEvent(self, event):
         qp = QtGui.QPainter(self)
-        qp.setPen(QtGui.QPen(QtGui.QColor('red'), 2))
+        # 使用更细更透明的绿色边框
+        qp.setPen(QtGui.QPen(QtGui.QColor(76, 175, 80, 200), 1))  # 绿色，1像素宽度，半透明
         qp.drawRect(QtCore.QRect(self.begin, self.end))
 
 
@@ -160,7 +161,8 @@ class InteractiveCropper(QtWidgets.QWidget):
     def paintEvent(self, event):
         qp = QtGui.QPainter(self)
         qp.fillRect(self.rect(), QtGui.QColor(0, 0, 0, 100))
-        qp.setPen(QtGui.QPen(QtGui.QColor('red'), 2))
+        # 使用更细更透明的绿色边框
+        qp.setPen(QtGui.QPen(QtGui.QColor(76, 175, 80, 200), 1))  # 绿色，1像素宽度，半透明
         qp.drawRect(self.box_x, self.box_y, self.box_width, self.box_height)
         qp.setPen(QtGui.QPen(QtGui.QColor('white'), 1))
         qp.drawText(self.box_x + 5, self.box_y + 20, f"{self.box_width}×{self.box_height}")
@@ -350,12 +352,12 @@ class PointSelector(QtWidgets.QWidget):
             x2 = max(self.first_point.x(), self.second_point.x())
             y2 = max(self.first_point.y(), self.second_point.y())
             
-            # 绘制选择框
-            qp.setPen(QtGui.QPen(QtGui.QColor('#4CAF50'), 3))  # 绿色边框
+            # 绘制选择框 - 更细更透明的绿色边框
+            qp.setPen(QtGui.QPen(QtGui.QColor(76, 175, 80, 200), 1))  # 绿色，1像素宽度，半透明
             qp.drawRect(x1, y1, x2 - x1, y2 - y1)
             
             # 绘制选择框内的半透明填充
-            qp.fillRect(x1, y1, x2 - x1, y2 - y1, QtGui.QColor(76, 175, 80, 50))
+            qp.fillRect(x1, y1, x2 - x1, y2 - y1, QtGui.QColor(76, 175, 80, 30))  # 更透明
             
             # 绘制尺寸信息
             width = x2 - x1

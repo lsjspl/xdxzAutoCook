@@ -125,61 +125,7 @@ class ClickUtils:
             logging.error(f"拖动绘制失败: {e}")
             return False
     
-    def fast_drag_draw_line(self, start_position, end_position):
-        """快速拖动绘制直线（极速版）"""
-        try:
-            start_x, start_y = int(start_position[0]), int(start_position[1])
-            end_x, end_y = int(end_position[0]), int(end_position[1])
-            
-            # 使用SetCursorPos + mouse_event实现瞬间拖动
-            # 设置鼠标位置到起始点
-            ctypes.windll.user32.SetCursorPos(start_x, start_y)
-            
-            # 按下鼠标左键
-            ctypes.windll.user32.mouse_event(0x0002, 0, 0, 0, 0)  # MOUSEEVENTF_LEFTDOWN
-            
-            # 瞬间移动到结束点
-            ctypes.windll.user32.SetCursorPos(end_x, end_y)
-            
-            # 松开鼠标左键
-            ctypes.windll.user32.mouse_event(0x0004, 0, 0, 0, 0)  # MOUSEEVENTF_LEFTUP
-            
-            logging.debug(f"瞬间拖动完成: 从({start_x}, {start_y})到({end_x}, {end_y})")
-            return True
-            
-        except Exception as e:
-            logging.error(f"瞬间拖动失败: {e}")
-            return False
-    
-    def ultra_fast_drag_draw_line(self, start_position, end_position):
-        """超高速拖动绘制直线（无延迟版）"""
-        try:
-            start_x, start_y = int(start_position[0]), int(start_position[1])
-            end_x, end_y = int(end_position[0]), int(end_position[1])
-            
-            logging.info(f"开始瞬间拖动：从({start_x}, {start_y})到({end_x}, {end_y})")
-            
-            # 使用最底层的API实现真正的瞬间拖动
-            # 直接调用SetCursorPos和mouse_event，无任何延迟
-            
-            # 移动到起始位置
-            ctypes.windll.user32.SetCursorPos(start_x, start_y)
-            
-            # 立即按下鼠标左键
-            ctypes.windll.user32.mouse_event(0x0002, 0, 0, 0, 0)
-            
-            # 立即移动到结束位置
-            ctypes.windll.user32.SetCursorPos(end_x, end_y)
-            
-            # 立即松开鼠标左键
-            ctypes.windll.user32.mouse_event(0x0004, 0, 0, 0, 0)
-            
-            logging.info(f"瞬间拖动完成: 从({start_x}, {start_y})到({end_x}, {end_y})")
-            return True
-            
-        except Exception as e:
-            logging.error(f"瞬间拖动失败: {e}")
-            return False
+
     
     def _click_position_winapi(self, position):
         """使用Windows API点击位置，包含多种点击方法和重试机制"""
@@ -257,13 +203,19 @@ class ClickUtils:
             screen_width = ctypes.windll.user32.GetSystemMetrics(0)
             screen_height = ctypes.windll.user32.GetSystemMetrics(1)
             
-            # 转换为绝对坐标 (0-65535)
+            # 将像素坐标夹紧到屏幕范围内
+            sx = max(0, min(int(x), screen_width - 1))
+            sy = max(0, min(int(y), screen_height - 1))
+            
+            # 转换为绝对坐标 (0-65535) - 使用(screen_size - 1)作为分母，避免边缘行/列映射不到位
             if flags & MOUSEEVENTF_MOVE or flags & MOUSEEVENTF_LEFTDOWN or flags & MOUSEEVENTF_LEFTUP:
-                abs_x = int(x * 65535 / screen_width)
-                abs_y = int(y * 65535 / screen_height)
+                denom_w = max(1, screen_width - 1)
+                denom_h = max(1, screen_height - 1)
+                abs_x = int(round(sx * 65535 / denom_w))
+                abs_y = int(round(sy * 65535 / denom_h))
                 flags |= MOUSEEVENTF_ABSOLUTE
             else:
-                abs_x, abs_y = x, y
+                abs_x, abs_y = sx, sy
 
             # 创建 INPUT 结构体
             extra = ctypes.c_ulong(0)
@@ -300,11 +252,3 @@ def click_position(position):
 def drag_draw_line(start_position, end_position, steps=10):
     """便捷的拖动绘制函数"""
     return click_utils.drag_draw_line(start_position, end_position, steps)
-
-def fast_drag_draw_line(start_position, end_position):
-    """便捷的快速拖动绘制函数"""
-    return click_utils.fast_drag_draw_line(start_position, end_position)
-
-def ultra_fast_drag_draw_line(start_position, end_position):
-    """便捷的超高速拖动绘制函数"""
-    return click_utils.ultra_fast_drag_draw_line(start_position, end_position)
