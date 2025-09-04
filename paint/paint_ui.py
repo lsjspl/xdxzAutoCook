@@ -299,6 +299,18 @@ class PaintMainUI(QWidget):
         self.setWindowTitle("绘图助手 - 心动小镇自动绘图工具")
         self.setGeometry(100, 100, 1200, 800)
         
+        # 设置窗口图标
+        try:
+            icon_path = os.path.join(os.path.dirname(__file__), 'icon', 'icon.ico')
+            if os.path.exists(icon_path):
+                from PyQt5.QtGui import QIcon
+                self.setWindowIcon(QIcon(icon_path))
+                logging.info(f"窗口图标设置成功: {icon_path}")
+            else:
+                logging.warning(f"图标文件不存在: {icon_path}")
+        except Exception as e:
+            logging.error(f"设置窗口图标失败: {e}")
+        
         # 创建主布局
         main_layout = QHBoxLayout()
         

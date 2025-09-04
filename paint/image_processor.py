@@ -8,8 +8,41 @@ import logging
 import os
 import numpy as np
 from PIL import Image, ImageDraw
-from sklearn.cluster import KMeans
+# from sklearn.cluster import KMeans  # 移除sklearn依赖
 from collections import Counter
+
+def simple_color_clustering(pixels, n_colors):
+    """
+    简单的颜色聚类算法，替代sklearn的KMeans
+    使用基于距离的聚类方法
+    """
+    if len(pixels) == 0:
+        return []
+    
+    # 如果像素数量少于目标颜色数，直接返回所有唯一颜色
+    unique_colors = np.unique(pixels, axis=0)
+    if len(unique_colors) <= n_colors:
+        return [tuple(color) for color in unique_colors]
+    
+    # 随机选择初始聚类中心
+    np.random.seed(42)
+    centers = pixels[np.random.choice(len(pixels), n_colors, replace=False)]
+    
+    # 简单的迭代聚类
+    for _ in range(10):  # 最多迭代10次
+        # 计算每个像素到最近聚类中心的距离
+        distances = np.sqrt(((pixels[:, np.newaxis] - centers[np.newaxis, :]) ** 2).sum(axis=2))
+        labels = np.argmin(distances, axis=1)
+        
+        # 更新聚类中心
+        new_centers = np.array([pixels[labels == i].mean(axis=0) for i in range(n_colors)])
+        
+        # 检查收敛
+        if np.allclose(centers, new_centers, atol=1):
+            break
+        centers = new_centers
+    
+    return [tuple(center.astype(int)) for center in centers]
 
 class ImageProcessor:
     """图片处理类"""
@@ -133,15 +166,8 @@ class ImageProcessor:
             # 重塑为像素列表
             pixels = img_array.reshape(-1, 3)
             
-            # 使用K-means聚类提取主要颜色
-            kmeans = KMeans(n_clusters=n_colors, random_state=42, n_init=10)
-            kmeans.fit(pixels)
-            
-            # 获取聚类中心（主要颜色）
-            colors = kmeans.cluster_centers_.astype(int)
-            
-            # 转换为元组列表
-            color_list = [tuple(color) for color in colors]
+            # 使用简单聚类算法提取主要颜色
+            color_list = simple_color_clustering(pixels, n_colors)
             
             logging.info(f"提取了{len(color_list)}种主要颜色")
             return color_list
