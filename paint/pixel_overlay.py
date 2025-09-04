@@ -6,8 +6,8 @@
 """
 
 import logging
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSlider, QCheckBox
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSlider, QCheckBox,QFileDialog
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QPainter, QPen, QBrush, QColor, QFont
 
 
@@ -233,7 +233,6 @@ class PixelOverlay(QWidget):
     def export_coordinates(self):
         """导出像素坐标"""
         try:
-            from PyQt5.QtWidgets import QFileDialog
             
             file_path, _ = QFileDialog.getSaveFileName(
                 self,

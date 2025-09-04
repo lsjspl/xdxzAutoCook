@@ -8,16 +8,12 @@ import logging
 import time
 from PyQt5.QtCore import QThread, pyqtSignal
 from click_utils import click_position
+import keyboard
+from click_utils import click_utils
+import time
+from PIL import ImageGrab
 
-try:
-    import keyboard
-    HOTKEY_ENABLED = True
-except ImportError:
-    HOTKEY_ENABLED = False
-    logging.warning("keyboard 未安装，热键功能将被禁用")
-
-
-
+HOTKEY_ENABLED = True
 
 class DrawingWorker(QThread):
     """绘图工作线程"""
@@ -113,8 +109,7 @@ class DrawingWorker(QThread):
         self.draw_click_delay = None
         self.mouse_move_delay = None
         
-        # 创建ClickUtils实例
-        from click_utils import click_utils
+
         self.click_utils = click_utils
         
         logging.info("绘图工作线程初始化完成")
@@ -138,7 +133,7 @@ class DrawingWorker(QThread):
     def run(self):
         """线程主函数"""
         try:
-            import time
+
             start_time = time.time()
             
             self.is_running = True
@@ -182,7 +177,8 @@ class DrawingWorker(QThread):
                 
                 # 绘制该颜色的所有像素点
                 # 逐个点击像素
-                processed_pixels += self._draw_pixels_individual(pixel_positions, total_pixels)
+                group_processed = self._draw_pixels_individual(pixel_positions, processed_pixels, total_pixels)
+                processed_pixels += group_processed
                 
                 # 完成当前颜色的绘制后，返回到父颜色区域
                 if not self.should_stop:
@@ -341,9 +337,9 @@ class DrawingWorker(QThread):
             logging.error(f"查找最接近颜色失败: {e}")
             return 0
     
-    def _draw_pixels_individual(self, pixel_positions, total_pixels):
+    def _draw_pixels_individual(self, pixel_positions, base_processed_pixels, total_pixels):
         """传统模式：逐个点击像素"""
-        processed_pixels = 0
+        group_processed_pixels = 0
         
         for i, position in enumerate(pixel_positions):
             # 检查是否需要停止
@@ -363,18 +359,19 @@ class DrawingWorker(QThread):
                 self.status_updated.emit("绘图已被用户停止")
                 break
             
-            processed_pixels += 1
+            group_processed_pixels += 1
+            current_total_processed = base_processed_pixels + group_processed_pixels
             
             # 更新进度
-            self.progress_updated.emit(processed_pixels, total_pixels)
+            self.progress_updated.emit(current_total_processed, total_pixels)
             
             # 每50个像素输出一次进度
-            if processed_pixels % 50 == 0:
-                progress_percent = processed_pixels / total_pixels * 100
-                self.status_updated.emit(f"绘图进度: {processed_pixels}/{total_pixels} ({progress_percent:.1f}%)")
-                logging.info(f"绘图进度: {processed_pixels}/{total_pixels} ({progress_percent:.1f}%)")
+            if current_total_processed % 50 == 0:
+                progress_percent = current_total_processed / total_pixels * 100
+                self.status_updated.emit(f"绘图进度: {current_total_processed}/{total_pixels} ({progress_percent:.1f}%)")
+                logging.info(f"绘图进度: {current_total_processed}/{total_pixels} ({progress_percent:.1f}%)")
         
-        return processed_pixels
+        return group_processed_pixels
     
 
     def _get_color_info(self, color_index):
@@ -569,7 +566,7 @@ class ScreenCaptureWorker(QThread):
     def run(self):
         """线程主函数"""
         try:
-            from PIL import ImageGrab
+
             
             if self.region:
                 # 截取指定区域

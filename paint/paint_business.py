@@ -12,8 +12,8 @@ from PyQt5.QtCore import QObject, pyqtSignal
 from image_processor import ImageProcessor
 from config_manager import ConfigManager
 from click_utils import click_position
-
-
+import re
+##
 class PaintBusiness(QObject):
     """绘图助手业务逻辑类"""
     
@@ -68,15 +68,6 @@ class PaintBusiness(QObject):
         
         logging.info("绘图业务逻辑初始化完成")
     
-    def _calculate_pixel_count(self, aspect_ratio_tuple, grid_count):
-        """根据比例和格子数量计算横向像素数"""
-        # 格子数量就是横向像素数
-        pixel_count = grid_count
-        
-        logging.info(f"比例 {aspect_ratio_tuple[0]}:{aspect_ratio_tuple[1]}, 格子数量: {grid_count}, 横向像素数: {pixel_count}")
-        
-        return pixel_count
-    
     def reset_image_related_data(self):
         """重置图片相关的数据，保留用户配置"""
         with self._state_lock:
@@ -87,16 +78,6 @@ class PaintBusiness(QObject):
             self.pixelized_image = None
             self.color_palette = []
             self.pixel_info_list = []
-            
-            # 注意：不重置以下用户配置相关的数据
-            # - draw_area_pos (绘画区域)
-            # - parent_color_area_pos (父颜色区域)
-            # - color_palette_button_pos (色盘按钮)
-            # - color_swatch_return_button_pos (色板返回按钮)
-            # - child_color_area_pos (子颜色区域)
-            # - background_color_button_pos (背景色按钮)
-            # - collected_colors (收集的颜色)
-            # - 各种延迟配置
             
             logging.info("business中的图片相关数据已重置")
     
@@ -632,19 +613,7 @@ class PaintBusiness(QObject):
             
             self.status_updated.emit("正在处理图片...")
             
-            # 转换宽高比字符串为元组
-            if isinstance(aspect_ratio, str):
-                try:
-                    width_str, height_str = aspect_ratio.split(':')
-                    aspect_ratio_tuple = (int(width_str), int(height_str))
-                except ValueError:
-                    self.status_updated.emit(f"无效的宽高比格式: {aspect_ratio}")
-                    return False
-            else:
-                aspect_ratio_tuple = aspect_ratio
-            
-            # 从尺寸文本中提取格子数量
-            import re
+
             size_match = re.search(r'(\d+)个格子', size_text)
             if size_match:
                 grid_count = int(size_match.group(1))
@@ -652,8 +621,8 @@ class PaintBusiness(QObject):
                 self.status_updated.emit(f"无效的尺寸格式: {size_text}")
                 return False
             
-            # 根据比例和格子数量计算横向像素数
-            pixel_count = self._calculate_pixel_count(aspect_ratio_tuple, grid_count)
+            # 使用格子数量作为像素数（简化逻辑）
+            pixel_count = grid_count
             
             # 从收集到的颜色中提取RGB值作为调色板
             # 重要：只使用子级颜色，过滤掉父级颜色
@@ -672,8 +641,8 @@ class PaintBusiness(QObject):
             # 像素化图片
             self.pixelized_image = self.image_processor.pixelize_image(
                 self.selected_image_path, 
-                aspect_ratio_tuple, 
                 pixel_count, 
+                pixel_count,  # 使用相同的值作为高度（保持向后兼容）
                 color_palette
             )
             
@@ -693,6 +662,84 @@ class PaintBusiness(QObject):
                 self.status_updated.emit("图片处理失败")
                 return False
                 
+        except Exception as e:
+            logging.error(f"处理图片失败: {e}")
+            self.status_updated.emit(f"处理图片失败: {str(e)}")
+            return False
+    
+    def process_image_with_dimensions(self, aspect_ratio, size_text, width, height):
+        """使用具体尺寸处理图片，进行像素化"""
+        try:
+            if not self.selected_image_path:
+                self.status_updated.emit("请先选择图片")
+                return False
+            
+            if not self.collected_colors:
+                self.status_updated.emit("请先收集颜色以获取颜色调色板")
+                return False
+            
+            self.status_updated.emit(f"正在处理图片，目标尺寸: {width}×{height}...")
+            
+            # 直接使用传入的width和height
+            target_width = width
+            target_height = height
+            
+            logging.info(f"使用配置的尺寸: {target_width}×{target_height}")
+            
+            # 从收集到的颜色中提取RGB值作为调色板
+            # 重要：只使用子级颜色，过滤掉父级颜色
+            child_colors = [color_info for color_info in self.collected_colors if not color_info.get('is_parent', False)]
+            
+            if not child_colors:
+                self.status_updated.emit("没有收集到子级颜色，无法处理图片")
+                logging.error("没有收集到子级颜色，无法处理图片")
+                return False
+            
+            color_palette = [color_info['rgb'] for color_info in child_colors]
+            
+            logging.info(f"使用{len(color_palette)}种子级颜色进行图片处理")
+            
+            # 调用图片处理器进行像素化
+            pixelized_image = self.image_processor.pixelize_image(
+                self.selected_image_path, 
+                target_width,  # 使用配置的宽度
+                target_height,  # 使用配置的高度
+                color_palette
+            )
+            
+            if not pixelized_image:
+                self.status_updated.emit("图片像素化失败")
+                return False
+            
+            # 保存像素化图片
+            self.pixelized_image = pixelized_image
+            
+            # 生成像素信息列表（如果绘画区域已设置）
+            if self.draw_area_pos:
+                draw_area_size = (self.draw_area_pos[2], self.draw_area_pos[3])
+                pixel_image_size = pixelized_image.size
+                pixel_size = self.image_processor.calculate_pixel_size(draw_area_size, pixel_image_size)
+                
+                # 获取像素位置信息
+                self.pixel_info_list = self.image_processor.get_pixel_positions(
+                    self.draw_area_pos, 
+                    pixelized_image, 
+                    pixel_size
+                )
+            else:
+                self.pixel_info_list = []
+            
+            # 发送处理完成信号
+            self.image_processed.emit(pixelized_image)
+            
+            # 如果绘画区域已设置，计算像素位置信息
+            if self.draw_area_pos:
+                self._calculate_pixel_positions()
+            
+            logging.info(f"图片处理完成，实际尺寸: {pixelized_image.size}")
+            self.status_updated.emit(f"图片处理完成，尺寸: {target_width}×{target_height}")
+            return True
+            
         except Exception as e:
             logging.error(f"处理图片失败: {e}")
             self.status_updated.emit(f"处理图片失败: {str(e)}")
@@ -952,20 +999,3 @@ class PaintBusiness(QObject):
         except Exception as e:
             logging.error(f"检查配置是否存在失败: {e}")
             return False
-
-
-
-
-if __name__ == "__main__":
-    # 测试代码
-    import sys
-    from PyQt5.QtWidgets import QApplication
-    
-    app = QApplication(sys.argv)
-    business = PaintBusiness()
-    
-    # 测试基本功能
-    business.set_draw_area((100, 100, 400, 400))
-    business.set_color_area((500, 100, 200, 400))
-    
-    logging.info("绘图业务逻辑测试完成")

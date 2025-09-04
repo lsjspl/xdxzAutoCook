@@ -9,7 +9,7 @@ import os
 import numpy as np
 from PIL import Image, ImageDraw
 from sklearn.cluster import KMeans
-
+from collections import Counter
 
 class ImageProcessor:
     """图片处理类"""
@@ -18,14 +18,14 @@ class ImageProcessor:
         """初始化图片处理器"""
         pass
     
-    def pixelize_image(self, image_path, aspect_ratio, pixel_count, color_palette=None):
+    def pixelize_image(self, image_path, target_width, target_height, color_palette=None):
         """
         像素化图片
         
         Args:
             image_path: 图片路径
-            aspect_ratio: 宽高比例 (width_ratio, height_ratio)
-            pixel_count: 横向像素数量
+            target_width: 目标宽度
+            target_height: 目标高度
             color_palette: 颜色调色板，如果提供则使用指定颜色
         
         Returns:
@@ -39,17 +39,9 @@ class ImageProcessor:
             if image.mode != 'RGB':
                 image = image.convert('RGB')
             
-            # 计算目标尺寸
-            width_ratio, height_ratio = aspect_ratio
-            target_width = pixel_count
-            target_height = int(pixel_count * height_ratio / width_ratio)
-            
             logging.info(f"目标像素尺寸: {target_width}×{target_height}")
             
-            # 调整图片尺寸以匹配目标比例
-            image = self._resize_to_aspect_ratio(image, width_ratio, height_ratio)
-            
-            # 缩小到目标像素尺寸
+            # 直接调整图片尺寸到目标尺寸
             small_image = image.resize((target_width, target_height), Image.Resampling.LANCZOS)
             
             # 如果提供了颜色调色板，进行颜色量化
@@ -67,35 +59,6 @@ class ImageProcessor:
         except Exception as e:
             logging.error(f"图片像素化失败: {e}")
             return None
-    
-    def _resize_to_aspect_ratio(self, image, width_ratio, height_ratio):
-        """
-        调整图片尺寸以匹配目标宽高比
-        
-        Args:
-            image: PIL图片对象
-            width_ratio: 宽度比例
-            height_ratio: 高度比例
-        
-        Returns:
-            PIL.Image: 调整后的图片
-        """
-        original_width, original_height = image.size
-        target_ratio = width_ratio / height_ratio
-        current_ratio = original_width / original_height
-        
-        if current_ratio > target_ratio:
-            # 图片太宽，需要裁剪宽度
-            new_width = int(original_height * target_ratio)
-            left = (original_width - new_width) // 2
-            image = image.crop((left, 0, left + new_width, original_height))
-        elif current_ratio < target_ratio:
-            # 图片太高，需要裁剪高度
-            new_height = int(original_width / target_ratio)
-            top = (original_height - new_height) // 2
-            image = image.crop((0, top, original_width, top + new_height))
-        
-        return image
     
     def _quantize_to_palette(self, image, color_palette):
         """
@@ -365,7 +328,7 @@ class ImageProcessor:
             if len(positions) != len(unique_positions):
                 logging.warning(f"检测到重复坐标: 总坐标{len(positions)}个，唯一坐标{len(unique_positions)}个")
                 # 找出重复的坐标
-                from collections import Counter
+
                 position_counts = Counter(positions)
                 duplicates = [(pos, count) for pos, count in position_counts.items() if count > 1]
                 if duplicates:

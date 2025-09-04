@@ -1,9 +1,9 @@
 {
   "draw_area_pos": [
-    1462,
-    277,
-    552,
-    551
+    1588,
+    274,
+    307,
+    550
   ],
   "parent_color_area_pos": [
     2362,
@@ -35,8 +35,6 @@
     40,
     26
   ],
-  "game_window_pos": null,
-  "game_window_size": null,
   "color_click_delay": 0.5,
   "draw_click_delay": 0.05,
   "mouse_move_delay": 0.01,
@@ -3238,5 +3236,9 @@
       "is_parent": false
     }
   ],
-  "save_time": "2025-09-01 13:56:46"
+  "aspect_ratio_and_size": {
+    "aspect_ratio": "9:16",
+    "size": "28个格子"
+  },
+  "save_time": "2025-09-02 16:38:39"
 }

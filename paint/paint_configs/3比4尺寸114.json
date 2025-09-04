@@ -1,0 +1,3244 @@
+{
+  "draw_area_pos": [
+    1530,
+    273,
+    418,
+    552
+  ],
+  "parent_color_area_pos": [
+    2362,
+    250,
+    168,
+    573
+  ],
+  "color_palette_button_pos": [
+    2301,
+    435,
+    22,
+    71
+  ],
+  "color_swatch_return_button_pos": [
+    2431,
+    255,
+    54,
+    38
+  ],
+  "child_color_area_pos": [
+    2372,
+    381,
+    155,
+    368
+  ],
+  "background_color_button_pos": [
+    2389,
+    813,
+    40,
+    26
+  ],
+  "color_click_delay": 0.5,
+  "draw_click_delay": 0.05,
+  "mouse_move_delay": 0.01,
+  "collected_colors": [
+    {
+      "rgb": [
+        5,
+        22,
+        22
+      ],
+      "position": [
+        2404,
+        285
+      ],
+      "parent": "父颜色1(RGB(5, 22, 22))",
+      "row": 0,
+      "col": 0,
+      "is_parent": true,
+      "parent_index": 0
+    },
+    {
+      "rgb": [
+        254,
+        255,
+        255
+      ],
+      "position": [
+        2488,
+        285
+      ],
+      "parent": "父颜色2(RGB(254, 255, 255))",
+      "row": 0,
+      "col": 1,
+      "is_parent": true,
+      "parent_index": 1
+    },
+    {
+      "rgb": [
+        128,
+        130,
+        130
+      ],
+      "position": [
+        2404,
+        356
+      ],
+      "parent": "父颜色3(RGB(128, 130, 130))",
+      "row": 1,
+      "col": 0,
+      "is_parent": true,
+      "parent_index": 2
+    },
+    {
+      "rgb": [
+        247,
+        244,
+        234
+      ],
+      "position": [
+        2488,
+        356
+      ],
+      "parent": "父颜色4(RGB(247, 244, 234))",
+      "row": 1,
+      "col": 1,
+      "is_parent": true,
+      "parent_index": 3
+    },
+    {
+      "rgb": [
+        238,
+        111,
+        114
+      ],
+      "position": [
+        2404,
+        427
+      ],
+      "parent": "父颜色5(RGB(238, 111, 114))",
+      "row": 2,
+      "col": 0,
+      "is_parent": true,
+      "parent_index": 4
+    },
+    {
+      "rgb": [
+        249,
+        131,
+        88
+      ],
+      "position": [
+        2488,
+        427
+      ],
+      "parent": "父颜色6(RGB(249, 131, 88))",
+      "row": 2,
+      "col": 1,
+      "is_parent": true,
+      "parent_index": 5
+    },
+    {
+      "rgb": [
+        254,
+        174,
+        59
+      ],
+      "position": [
+        2404,
+        498
+      ],
+      "parent": "父颜色7(RGB(254, 174, 59))",
+      "row": 3,
+      "col": 0,
+      "is_parent": true,
+      "parent_index": 6
+    },
+    {
+      "rgb": [
+        249,
+        216,
+        56
+      ],
+      "position": [
+        2488,
+        498
+      ],
+      "parent": "父颜色8(RGB(249, 216, 56))",
+      "row": 3,
+      "col": 1,
+      "is_parent": true,
+      "parent_index": 7
+    },
+    {
+      "rgb": [
+        182,
+        201,
+        49
+      ],
+      "position": [
+        2404,
+        569
+      ],
+      "parent": "父颜色9(RGB(182, 201, 49))",
+      "row": 4,
+      "col": 0,
+      "is_parent": true,
+      "parent_index": 8
+    },
+    {
+      "rgb": [
+        65,
+        185,
+        123
+      ],
+      "position": [
+        2488,
+        569
+      ],
+      "parent": "父颜色10(RGB(65, 185, 123))",
+      "row": 4,
+      "col": 1,
+      "is_parent": true,
+      "parent_index": 9
+    },
+    {
+      "rgb": [
+        5,
+        171,
+        160
+      ],
+      "position": [
+        2404,
+        640
+      ],
+      "parent": "父颜色11(RGB(5, 171, 160))",
+      "row": 5,
+      "col": 0,
+      "is_parent": true,
+      "parent_index": 10
+    },
+    {
+      "rgb": [
+        5,
+        153,
+        186
+      ],
+      "position": [
+        2488,
+        640
+      ],
+      "parent": "父颜色12(RGB(5, 153, 186))",
+      "row": 5,
+      "col": 1,
+      "is_parent": true,
+      "parent_index": 11
+    },
+    {
+      "rgb": [
+        43,
+        131,
+        193
+      ],
+      "position": [
+        2404,
+        711
+      ],
+      "parent": "父颜色13(RGB(43, 131, 193))",
+      "row": 6,
+      "col": 0,
+      "is_parent": true,
+      "parent_index": 12
+    },
+    {
+      "rgb": [
+        117,
+        119,
+        189
+      ],
+      "position": [
+        2488,
+        711
+      ],
+      "parent": "父颜色14(RGB(117, 119, 189))",
+      "row": 6,
+      "col": 1,
+      "is_parent": true,
+      "parent_index": 13
+    },
+    {
+      "rgb": [
+        161,
+        103,
+        169
+      ],
+      "position": [
+        2404,
+        782
+      ],
+      "parent": "父颜色15(RGB(161, 103, 169))",
+      "row": 7,
+      "col": 0,
+      "is_parent": true,
+      "parent_index": 14
+    },
+    {
+      "rgb": [
+        207,
+        107,
+        143
+      ],
+      "position": [
+        2488,
+        782
+      ],
+      "parent": "父颜色16(RGB(207, 107, 143))",
+      "row": 7,
+      "col": 1,
+      "is_parent": true,
+      "parent_index": 15
+    },
+    {
+      "rgb": [
+        5,
+        22,
+        22
+      ],
+      "position": [
+        2410,
+        417
+      ],
+      "parent": "父颜色1(RGB(5, 22, 22))",
+      "row": 0,
+      "col": 0,
+      "parent_color": [
+        5,
+        22,
+        22
+      ],
+      "parent_index": 0,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        65,
+        69,
+        69
+      ],
+      "position": [
+        2487,
+        417
+      ],
+      "parent": "父颜色1(RGB(5, 22, 22))",
+      "row": 0,
+      "col": 1,
+      "parent_color": [
+        5,
+        22,
+        22
+      ],
+      "parent_index": 0,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        128,
+        130,
+        130
+      ],
+      "position": [
+        2410,
+        490
+      ],
+      "parent": "父颜色1(RGB(5, 22, 22))",
+      "row": 1,
+      "col": 0,
+      "parent_color": [
+        5,
+        22,
+        22
+      ],
+      "parent_index": 0,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        190,
+        191,
+        191
+      ],
+      "position": [
+        2487,
+        490
+      ],
+      "parent": "父颜色1(RGB(5, 22, 22))",
+      "row": 1,
+      "col": 1,
+      "parent_color": [
+        5,
+        22,
+        22
+      ],
+      "parent_index": 0,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        254,
+        255,
+        255
+      ],
+      "position": [
+        2410,
+        563
+      ],
+      "parent": "父颜色1(RGB(5, 22, 22))",
+      "row": 2,
+      "col": 0,
+      "parent_color": [
+        5,
+        22,
+        22
+      ],
+      "parent_index": 0,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        247,
+        244,
+        233
+      ],
+      "position": [
+        2487,
+        563
+      ],
+      "parent": "父颜色1(RGB(5, 22, 22))",
+      "row": 2,
+      "col": 1,
+      "parent_color": [
+        5,
+        22,
+        22
+      ],
+      "parent_index": 0,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        5,
+        22,
+        22
+      ],
+      "position": [
+        2410,
+        417
+      ],
+      "parent": "父颜色2(RGB(254, 255, 255))",
+      "row": 0,
+      "col": 0,
+      "parent_color": [
+        254,
+        255,
+        255
+      ],
+      "parent_index": 1,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        65,
+        69,
+        69
+      ],
+      "position": [
+        2487,
+        417
+      ],
+      "parent": "父颜色2(RGB(254, 255, 255))",
+      "row": 0,
+      "col": 1,
+      "parent_color": [
+        254,
+        255,
+        255
+      ],
+      "parent_index": 1,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        128,
+        130,
+        130
+      ],
+      "position": [
+        2410,
+        490
+      ],
+      "parent": "父颜色2(RGB(254, 255, 255))",
+      "row": 1,
+      "col": 0,
+      "parent_color": [
+        254,
+        255,
+        255
+      ],
+      "parent_index": 1,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        190,
+        191,
+        191
+      ],
+      "position": [
+        2487,
+        490
+      ],
+      "parent": "父颜色2(RGB(254, 255, 255))",
+      "row": 1,
+      "col": 1,
+      "parent_color": [
+        254,
+        255,
+        255
+      ],
+      "parent_index": 1,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        254,
+        255,
+        255
+      ],
+      "position": [
+        2410,
+        563
+      ],
+      "parent": "父颜色2(RGB(254, 255, 255))",
+      "row": 2,
+      "col": 0,
+      "parent_color": [
+        254,
+        255,
+        255
+      ],
+      "parent_index": 1,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        247,
+        244,
+        233
+      ],
+      "position": [
+        2487,
+        563
+      ],
+      "parent": "父颜色2(RGB(254, 255, 255))",
+      "row": 2,
+      "col": 1,
+      "parent_color": [
+        254,
+        255,
+        255
+      ],
+      "parent_index": 1,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        5,
+        22,
+        22
+      ],
+      "position": [
+        2410,
+        417
+      ],
+      "parent": "父颜色3(RGB(128, 130, 130))",
+      "row": 0,
+      "col": 0,
+      "parent_color": [
+        128,
+        130,
+        130
+      ],
+      "parent_index": 2,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        65,
+        69,
+        69
+      ],
+      "position": [
+        2487,
+        417
+      ],
+      "parent": "父颜色3(RGB(128, 130, 130))",
+      "row": 0,
+      "col": 1,
+      "parent_color": [
+        128,
+        130,
+        130
+      ],
+      "parent_index": 2,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        128,
+        130,
+        130
+      ],
+      "position": [
+        2410,
+        490
+      ],
+      "parent": "父颜色3(RGB(128, 130, 130))",
+      "row": 1,
+      "col": 0,
+      "parent_color": [
+        128,
+        130,
+        130
+      ],
+      "parent_index": 2,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        190,
+        191,
+        191
+      ],
+      "position": [
+        2487,
+        490
+      ],
+      "parent": "父颜色3(RGB(128, 130, 130))",
+      "row": 1,
+      "col": 1,
+      "parent_color": [
+        128,
+        130,
+        130
+      ],
+      "parent_index": 2,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        254,
+        255,
+        255
+      ],
+      "position": [
+        2410,
+        563
+      ],
+      "parent": "父颜色3(RGB(128, 130, 130))",
+      "row": 2,
+      "col": 0,
+      "parent_color": [
+        128,
+        130,
+        130
+      ],
+      "parent_index": 2,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        247,
+        244,
+        233
+      ],
+      "position": [
+        2487,
+        563
+      ],
+      "parent": "父颜色3(RGB(128, 130, 130))",
+      "row": 2,
+      "col": 1,
+      "parent_color": [
+        128,
+        130,
+        130
+      ],
+      "parent_index": 2,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        5,
+        22,
+        22
+      ],
+      "position": [
+        2410,
+        417
+      ],
+      "parent": "父颜色4(RGB(247, 244, 234))",
+      "row": 0,
+      "col": 0,
+      "parent_color": [
+        247,
+        244,
+        234
+      ],
+      "parent_index": 3,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        65,
+        69,
+        69
+      ],
+      "position": [
+        2487,
+        417
+      ],
+      "parent": "父颜色4(RGB(247, 244, 234))",
+      "row": 0,
+      "col": 1,
+      "parent_color": [
+        247,
+        244,
+        234
+      ],
+      "parent_index": 3,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        128,
+        130,
+        130
+      ],
+      "position": [
+        2410,
+        490
+      ],
+      "parent": "父颜色4(RGB(247, 244, 234))",
+      "row": 1,
+      "col": 0,
+      "parent_color": [
+        247,
+        244,
+        234
+      ],
+      "parent_index": 3,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        190,
+        191,
+        191
+      ],
+      "position": [
+        2487,
+        490
+      ],
+      "parent": "父颜色4(RGB(247, 244, 234))",
+      "row": 1,
+      "col": 1,
+      "parent_color": [
+        247,
+        244,
+        234
+      ],
+      "parent_index": 3,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        254,
+        255,
+        255
+      ],
+      "position": [
+        2410,
+        563
+      ],
+      "parent": "父颜色4(RGB(247, 244, 234))",
+      "row": 2,
+      "col": 0,
+      "parent_color": [
+        247,
+        244,
+        234
+      ],
+      "parent_index": 3,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        247,
+        244,
+        233
+      ],
+      "position": [
+        2487,
+        563
+      ],
+      "parent": "父颜色4(RGB(247, 244, 234))",
+      "row": 2,
+      "col": 1,
+      "parent_color": [
+        247,
+        244,
+        234
+      ],
+      "parent_index": 3,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        207,
+        53,
+        77
+      ],
+      "position": [
+        2410,
+        417
+      ],
+      "parent": "父颜色5(RGB(238, 111, 114))",
+      "row": 0,
+      "col": 0,
+      "parent_color": [
+        238,
+        111,
+        114
+      ],
+      "parent_index": 4,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        238,
+        111,
+        114
+      ],
+      "position": [
+        2487,
+        417
+      ],
+      "parent": "父颜色5(RGB(238, 111, 114))",
+      "row": 0,
+      "col": 1,
+      "parent_color": [
+        238,
+        111,
+        114
+      ],
+      "parent_index": 4,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        166,
+        38,
+        61
+      ],
+      "position": [
+        2410,
+        490
+      ],
+      "parent": "父颜色5(RGB(238, 111, 114))",
+      "row": 1,
+      "col": 0,
+      "parent_color": [
+        238,
+        111,
+        114
+      ],
+      "parent_index": 4,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        245,
+        172,
+        166
+      ],
+      "position": [
+        2487,
+        490
+      ],
+      "parent": "父颜色5(RGB(238, 111, 114))",
+      "row": 1,
+      "col": 1,
+      "parent_color": [
+        238,
+        111,
+        114
+      ],
+      "parent_index": 4,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        201,
+        132,
+        131
+      ],
+      "position": [
+        2410,
+        563
+      ],
+      "parent": "父颜色5(RGB(238, 111, 114))",
+      "row": 2,
+      "col": 0,
+      "parent_color": [
+        238,
+        111,
+        114
+      ],
+      "parent_index": 4,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        163,
+        93,
+        94
+      ],
+      "position": [
+        2487,
+        563
+      ],
+      "parent": "父颜色5(RGB(238, 111, 114))",
+      "row": 2,
+      "col": 1,
+      "parent_color": [
+        238,
+        111,
+        114
+      ],
+      "parent_index": 4,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        105,
+        49,
+        59
+      ],
+      "position": [
+        2410,
+        636
+      ],
+      "parent": "父颜色5(RGB(238, 111, 114))",
+      "row": 3,
+      "col": 0,
+      "parent_color": [
+        238,
+        111,
+        114
+      ],
+      "parent_index": 4,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        231,
+        213,
+        213
+      ],
+      "position": [
+        2487,
+        636
+      ],
+      "parent": "父颜色5(RGB(238, 111, 114))",
+      "row": 3,
+      "col": 1,
+      "parent_color": [
+        238,
+        111,
+        114
+      ],
+      "parent_index": 4,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        192,
+        172,
+        171
+      ],
+      "position": [
+        2410,
+        709
+      ],
+      "parent": "父颜色5(RGB(238, 111, 114))",
+      "row": 4,
+      "col": 0,
+      "parent_color": [
+        238,
+        111,
+        114
+      ],
+      "parent_index": 4,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        233,
+        94,
+        43
+      ],
+      "position": [
+        2410,
+        417
+      ],
+      "parent": "父颜色6(RGB(249, 131, 88))",
+      "row": 0,
+      "col": 0,
+      "parent_color": [
+        249,
+        131,
+        88
+      ],
+      "parent_index": 5,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        249,
+        131,
+        88
+      ],
+      "position": [
+        2487,
+        417
+      ],
+      "parent": "父颜色6(RGB(249, 131, 88))",
+      "row": 0,
+      "col": 1,
+      "parent_color": [
+        249,
+        131,
+        88
+      ],
+      "parent_index": 5,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        171,
+        66,
+        38
+      ],
+      "position": [
+        2410,
+        490
+      ],
+      "parent": "父颜色6(RGB(249, 131, 88))",
+      "row": 1,
+      "col": 0,
+      "parent_color": [
+        249,
+        131,
+        88
+      ],
+      "parent_index": 5,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        254,
+        186,
+        159
+      ],
+      "position": [
+        2487,
+        490
+      ],
+      "parent": "父颜色6(RGB(249, 131, 88))",
+      "row": 1,
+      "col": 1,
+      "parent_color": [
+        249,
+        131,
+        88
+      ],
+      "parent_index": 5,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        217,
+        147,
+        124
+      ],
+      "position": [
+        2410,
+        563
+      ],
+      "parent": "父颜色6(RGB(249, 131, 88))",
+      "row": 2,
+      "col": 0,
+      "parent_color": [
+        249,
+        131,
+        88
+      ],
+      "parent_index": 5,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        175,
+        108,
+        88
+      ],
+      "position": [
+        2487,
+        563
+      ],
+      "parent": "父颜色6(RGB(249, 131, 88))",
+      "row": 2,
+      "col": 1,
+      "parent_color": [
+        249,
+        131,
+        88
+      ],
+      "parent_index": 5,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        117,
+        59,
+        49
+      ],
+      "position": [
+        2410,
+        636
+      ],
+      "parent": "父颜色6(RGB(249, 131, 88))",
+      "row": 3,
+      "col": 0,
+      "parent_color": [
+        249,
+        131,
+        88
+      ],
+      "parent_index": 5,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        233,
+        213,
+        208
+      ],
+      "position": [
+        2487,
+        636
+      ],
+      "parent": "父颜色6(RGB(249, 131, 88))",
+      "row": 3,
+      "col": 1,
+      "parent_color": [
+        249,
+        131,
+        88
+      ],
+      "parent_index": 5,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        193,
+        172,
+        166
+      ],
+      "position": [
+        2410,
+        709
+      ],
+      "parent": "父颜色6(RGB(249, 131, 88))",
+      "row": 4,
+      "col": 0,
+      "parent_color": [
+        249,
+        131,
+        88
+      ],
+      "parent_index": 5,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        244,
+        158,
+        22
+      ],
+      "position": [
+        2410,
+        417
+      ],
+      "parent": "父颜色7(RGB(254, 174, 59))",
+      "row": 0,
+      "col": 0,
+      "parent_color": [
+        254,
+        174,
+        59
+      ],
+      "parent_index": 6,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        254,
+        174,
+        59
+      ],
+      "position": [
+        2487,
+        417
+      ],
+      "parent": "父颜色7(RGB(254, 174, 59))",
+      "row": 0,
+      "col": 1,
+      "parent_color": [
+        254,
+        174,
+        59
+      ],
+      "parent_index": 6,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        177,
+        111,
+        22
+      ],
+      "position": [
+        2410,
+        490
+      ],
+      "parent": "父颜色7(RGB(254, 174, 59))",
+      "row": 1,
+      "col": 0,
+      "parent_color": [
+        254,
+        174,
+        59
+      ],
+      "parent_index": 6,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        254,
+        206,
+        146
+      ],
+      "position": [
+        2487,
+        490
+      ],
+      "parent": "父颜色7(RGB(254, 174, 59))",
+      "row": 1,
+      "col": 1,
+      "parent_color": [
+        254,
+        174,
+        59
+      ],
+      "parent_index": 6,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        218,
+        167,
+        109
+      ],
+      "position": [
+        2410,
+        563
+      ],
+      "parent": "父颜色7(RGB(254, 174, 59))",
+      "row": 2,
+      "col": 0,
+      "parent_color": [
+        254,
+        174,
+        59
+      ],
+      "parent_index": 6,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        179,
+        129,
+        75
+      ],
+      "position": [
+        2487,
+        563
+      ],
+      "parent": "父颜色7(RGB(254, 174, 59))",
+      "row": 2,
+      "col": 1,
+      "parent_color": [
+        254,
+        174,
+        59
+      ],
+      "parent_index": 6,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        121,
+        81,
+        38
+      ],
+      "position": [
+        2410,
+        636
+      ],
+      "parent": "父颜色7(RGB(254, 174, 59))",
+      "row": 3,
+      "col": 0,
+      "parent_color": [
+        254,
+        174,
+        59
+      ],
+      "parent_index": 6,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        245,
+        228,
+        206
+      ],
+      "position": [
+        2487,
+        636
+      ],
+      "parent": "父颜色7(RGB(254, 174, 59))",
+      "row": 3,
+      "col": 1,
+      "parent_color": [
+        254,
+        174,
+        59
+      ],
+      "parent_index": 6,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        205,
+        188,
+        169
+      ],
+      "position": [
+        2410,
+        709
+      ],
+      "parent": "父颜色7(RGB(254, 174, 59))",
+      "row": 4,
+      "col": 0,
+      "parent_color": [
+        254,
+        174,
+        59
+      ],
+      "parent_index": 6,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        128,
+        111,
+        94
+      ],
+      "position": [
+        2487,
+        709
+      ],
+      "parent": "父颜色7(RGB(254, 174, 59))",
+      "row": 4,
+      "col": 1,
+      "parent_color": [
+        254,
+        174,
+        59
+      ],
+      "parent_index": 6,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        237,
+        202,
+        22
+      ],
+      "position": [
+        2410,
+        417
+      ],
+      "parent": "父颜色8(RGB(249, 216, 56))",
+      "row": 0,
+      "col": 0,
+      "parent_color": [
+        249,
+        216,
+        56
+      ],
+      "parent_index": 7,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        249,
+        216,
+        56
+      ],
+      "position": [
+        2487,
+        417
+      ],
+      "parent": "父颜色8(RGB(249, 216, 56))",
+      "row": 0,
+      "col": 1,
+      "parent_color": [
+        249,
+        216,
+        56
+      ],
+      "parent_index": 7,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        179,
+        148,
+        22
+      ],
+      "position": [
+        2410,
+        490
+      ],
+      "parent": "父颜色8(RGB(249, 216, 56))",
+      "row": 1,
+      "col": 0,
+      "parent_color": [
+        249,
+        216,
+        56
+      ],
+      "parent_index": 7,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        250,
+        231,
+        145
+      ],
+      "position": [
+        2487,
+        490
+      ],
+      "parent": "父颜色8(RGB(249, 216, 56))",
+      "row": 1,
+      "col": 1,
+      "parent_color": [
+        249,
+        216,
+        56
+      ],
+      "parent_index": 7,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        211,
+        190,
+        111
+      ],
+      "position": [
+        2410,
+        563
+      ],
+      "parent": "父颜色8(RGB(249, 216, 56))",
+      "row": 2,
+      "col": 0,
+      "parent_color": [
+        249,
+        216,
+        56
+      ],
+      "parent_index": 7,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        171,
+        149,
+        75
+      ],
+      "position": [
+        2487,
+        563
+      ],
+      "parent": "父颜色8(RGB(249, 216, 56))",
+      "row": 2,
+      "col": 1,
+      "parent_color": [
+        249,
+        216,
+        56
+      ],
+      "parent_index": 7,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        117,
+        99,
+        38
+      ],
+      "position": [
+        2410,
+        636
+      ],
+      "parent": "父颜色8(RGB(249, 216, 56))",
+      "row": 3,
+      "col": 0,
+      "parent_color": [
+        249,
+        216,
+        56
+      ],
+      "parent_index": 7,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        238,
+        231,
+        199
+      ],
+      "position": [
+        2487,
+        636
+      ],
+      "parent": "父颜色8(RGB(249, 216, 56))",
+      "row": 3,
+      "col": 1,
+      "parent_color": [
+        249,
+        216,
+        56
+      ],
+      "parent_index": 7,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        198,
+        191,
+        162
+      ],
+      "position": [
+        2410,
+        709
+      ],
+      "parent": "父颜色8(RGB(249, 216, 56))",
+      "row": 4,
+      "col": 0,
+      "parent_color": [
+        249,
+        216,
+        56
+      ],
+      "parent_index": 7,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        168,
+        188,
+        22
+      ],
+      "position": [
+        2410,
+        417
+      ],
+      "parent": "父颜色9(RGB(182, 201, 49))",
+      "row": 0,
+      "col": 0,
+      "parent_color": [
+        182,
+        201,
+        49
+      ],
+      "parent_index": 8,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        182,
+        201,
+        49
+      ],
+      "position": [
+        2487,
+        417
+      ],
+      "parent": "父颜色9(RGB(182, 201, 49))",
+      "row": 0,
+      "col": 1,
+      "parent_color": [
+        182,
+        201,
+        49
+      ],
+      "parent_index": 8,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        117,
+        134,
+        22
+      ],
+      "position": [
+        2410,
+        490
+      ],
+      "parent": "父颜色9(RGB(182, 201, 49))",
+      "row": 1,
+      "col": 0,
+      "parent_color": [
+        182,
+        201,
+        49
+      ],
+      "parent_index": 8,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        216,
+        223,
+        147
+      ],
+      "position": [
+        2487,
+        490
+      ],
+      "parent": "父颜色9(RGB(182, 201, 49))",
+      "row": 1,
+      "col": 1,
+      "parent_color": [
+        182,
+        201,
+        49
+      ],
+      "parent_index": 8,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        173,
+        183,
+        109
+      ],
+      "position": [
+        2410,
+        563
+      ],
+      "parent": "父颜色9(RGB(182, 201, 49))",
+      "row": 2,
+      "col": 0,
+      "parent_color": [
+        182,
+        201,
+        49
+      ],
+      "parent_index": 8,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        133,
+        145,
+        75
+      ],
+      "position": [
+        2487,
+        563
+      ],
+      "parent": "父颜色9(RGB(182, 201, 49))",
+      "row": 2,
+      "col": 1,
+      "parent_color": [
+        182,
+        201,
+        49
+      ],
+      "parent_index": 8,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        83,
+        94,
+        43
+      ],
+      "position": [
+        2410,
+        636
+      ],
+      "parent": "父颜色9(RGB(182, 201, 49))",
+      "row": 3,
+      "col": 0,
+      "parent_color": [
+        182,
+        201,
+        49
+      ],
+      "parent_index": 8,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        230,
+        233,
+        199
+      ],
+      "position": [
+        2487,
+        636
+      ],
+      "parent": "父颜色9(RGB(182, 201, 49))",
+      "row": 3,
+      "col": 1,
+      "parent_color": [
+        182,
+        201,
+        49
+      ],
+      "parent_index": 8,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        188,
+        194,
+        163
+      ],
+      "position": [
+        2410,
+        709
+      ],
+      "parent": "父颜色9(RGB(182, 201, 49))",
+      "row": 4,
+      "col": 0,
+      "parent_color": [
+        182,
+        201,
+        49
+      ],
+      "parent_index": 8,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        110,
+        116,
+        93
+      ],
+      "position": [
+        2487,
+        709
+      ],
+      "parent": "父颜色9(RGB(182, 201, 49))",
+      "row": 4,
+      "col": 1,
+      "parent_color": [
+        182,
+        201,
+        49
+      ],
+      "parent_index": 8,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        5,
+        162,
+        93
+      ],
+      "position": [
+        2410,
+        417
+      ],
+      "parent": "父颜色10(RGB(65, 185, 123))",
+      "row": 0,
+      "col": 0,
+      "parent_color": [
+        65,
+        185,
+        123
+      ],
+      "parent_index": 9,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        65,
+        185,
+        123
+      ],
+      "position": [
+        2487,
+        417
+      ],
+      "parent": "父颜色10(RGB(65, 185, 123))",
+      "row": 0,
+      "col": 1,
+      "parent_color": [
+        65,
+        185,
+        123
+      ],
+      "parent_index": 9,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        5,
+        116,
+        71
+      ],
+      "position": [
+        2410,
+        490
+      ],
+      "parent": "父颜色10(RGB(65, 185, 123))",
+      "row": 1,
+      "col": 0,
+      "parent_color": [
+        65,
+        185,
+        123
+      ],
+      "parent_index": 9,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        156,
+        218,
+        173
+      ],
+      "position": [
+        2487,
+        490
+      ],
+      "parent": "父颜色10(RGB(65, 185, 123))",
+      "row": 1,
+      "col": 1,
+      "parent_color": [
+        65,
+        185,
+        123
+      ],
+      "parent_index": 9,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        118,
+        178,
+        139
+      ],
+      "position": [
+        2410,
+        563
+      ],
+      "parent": "父颜色10(RGB(65, 185, 123))",
+      "row": 2,
+      "col": 0,
+      "parent_color": [
+        65,
+        185,
+        123
+      ],
+      "parent_index": 9,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        79,
+        137,
+        105
+      ],
+      "position": [
+        2487,
+        563
+      ],
+      "parent": "父颜色10(RGB(65, 185, 123))",
+      "row": 2,
+      "col": 1,
+      "parent_color": [
+        65,
+        185,
+        123
+      ],
+      "parent_index": 9,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        36,
+        86,
+        64
+      ],
+      "position": [
+        2410,
+        636
+      ],
+      "parent": "父颜色10(RGB(65, 185, 123))",
+      "row": 3,
+      "col": 0,
+      "parent_color": [
+        65,
+        185,
+        123
+      ],
+      "parent_index": 9,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        195,
+        224,
+        204
+      ],
+      "position": [
+        2487,
+        636
+      ],
+      "parent": "父颜色10(RGB(65, 185, 123))",
+      "row": 3,
+      "col": 1,
+      "parent_color": [
+        65,
+        185,
+        123
+      ],
+      "parent_index": 9,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        157,
+        183,
+        166
+      ],
+      "position": [
+        2410,
+        709
+      ],
+      "parent": "父颜色10(RGB(65, 185, 123))",
+      "row": 4,
+      "col": 0,
+      "parent_color": [
+        65,
+        185,
+        123
+      ],
+      "parent_index": 9,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        83,
+        105,
+        93
+      ],
+      "position": [
+        2487,
+        709
+      ],
+      "parent": "父颜色10(RGB(65, 185, 123))",
+      "row": 4,
+      "col": 1,
+      "parent_color": [
+        65,
+        185,
+        123
+      ],
+      "parent_index": 9,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        5,
+        135,
+        129
+      ],
+      "position": [
+        2410,
+        417
+      ],
+      "parent": "父颜色11(RGB(5, 171, 160))",
+      "row": 0,
+      "col": 0,
+      "parent_color": [
+        5,
+        171,
+        160
+      ],
+      "parent_index": 10,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        5,
+        171,
+        160
+      ],
+      "position": [
+        2487,
+        417
+      ],
+      "parent": "父颜色11(RGB(5, 171, 160))",
+      "row": 0,
+      "col": 1,
+      "parent_color": [
+        5,
+        171,
+        160
+      ],
+      "parent_index": 10,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        5,
+        105,
+        102
+      ],
+      "position": [
+        2410,
+        490
+      ],
+      "parent": "父颜色11(RGB(5, 171, 160))",
+      "row": 1,
+      "col": 0,
+      "parent_color": [
+        5,
+        171,
+        160
+      ],
+      "parent_index": 10,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        126,
+        205,
+        194
+      ],
+      "position": [
+        2487,
+        490
+      ],
+      "parent": "父颜色11(RGB(5, 171, 160))",
+      "row": 1,
+      "col": 1,
+      "parent_color": [
+        5,
+        171,
+        160
+      ],
+      "parent_index": 10,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        85,
+        164,
+        156
+      ],
+      "position": [
+        2410,
+        563
+      ],
+      "parent": "父颜色11(RGB(5, 171, 160))",
+      "row": 2,
+      "col": 0,
+      "parent_color": [
+        5,
+        171,
+        160
+      ],
+      "parent_index": 10,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        43,
+        126,
+        120
+      ],
+      "position": [
+        2487,
+        563
+      ],
+      "parent": "父颜色11(RGB(5, 171, 160))",
+      "row": 2,
+      "col": 1,
+      "parent_color": [
+        5,
+        171,
+        160
+      ],
+      "parent_index": 10,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        5,
+        75,
+        75
+      ],
+      "position": [
+        2410,
+        636
+      ],
+      "parent": "父颜色11(RGB(5, 171, 160))",
+      "row": 3,
+      "col": 0,
+      "parent_color": [
+        5,
+        171,
+        160
+      ],
+      "parent_index": 10,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        190,
+        224,
+        218
+      ],
+      "position": [
+        2487,
+        636
+      ],
+      "parent": "父颜色11(RGB(5, 171, 160))",
+      "row": 3,
+      "col": 1,
+      "parent_color": [
+        5,
+        171,
+        160
+      ],
+      "parent_index": 10,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        152,
+        183,
+        178
+      ],
+      "position": [
+        2410,
+        709
+      ],
+      "parent": "父颜色11(RGB(5, 171, 160))",
+      "row": 4,
+      "col": 0,
+      "parent_color": [
+        5,
+        171,
+        160
+      ],
+      "parent_index": 10,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        78,
+        107,
+        102
+      ],
+      "position": [
+        2487,
+        709
+      ],
+      "parent": "父颜色11(RGB(5, 171, 160))",
+      "row": 4,
+      "col": 1,
+      "parent_color": [
+        5,
+        171,
+        160
+      ],
+      "parent_index": 10,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        5,
+        114,
+        156
+      ],
+      "position": [
+        2410,
+        417
+      ],
+      "parent": "父颜色12(RGB(5, 153, 186))",
+      "row": 0,
+      "col": 0,
+      "parent_color": [
+        5,
+        153,
+        186
+      ],
+      "parent_index": 11,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        5,
+        153,
+        186
+      ],
+      "position": [
+        2487,
+        417
+      ],
+      "parent": "父颜色12(RGB(5, 153, 186))",
+      "row": 0,
+      "col": 1,
+      "parent_color": [
+        5,
+        153,
+        186
+      ],
+      "parent_index": 11,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        5,
+        88,
+        120
+      ],
+      "position": [
+        2410,
+        490
+      ],
+      "parent": "父颜色12(RGB(5, 153, 186))",
+      "row": 1,
+      "col": 0,
+      "parent_color": [
+        5,
+        153,
+        186
+      ],
+      "parent_index": 11,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        121,
+        187,
+        202
+      ],
+      "position": [
+        2487,
+        490
+      ],
+      "parent": "父颜色12(RGB(5, 153, 186))",
+      "row": 1,
+      "col": 1,
+      "parent_color": [
+        5,
+        153,
+        186
+      ],
+      "parent_index": 11,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        81,
+        147,
+        165
+      ],
+      "position": [
+        2410,
+        563
+      ],
+      "parent": "父颜色12(RGB(5, 153, 186))",
+      "row": 2,
+      "col": 0,
+      "parent_color": [
+        5,
+        153,
+        186
+      ],
+      "parent_index": 11,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        36,
+        109,
+        127
+      ],
+      "position": [
+        2487,
+        563
+      ],
+      "parent": "父颜色12(RGB(5, 153, 186))",
+      "row": 2,
+      "col": 1,
+      "parent_color": [
+        5,
+        153,
+        186
+      ],
+      "parent_index": 11,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        5,
+        73,
+        91
+      ],
+      "position": [
+        2410,
+        636
+      ],
+      "parent": "父颜色12(RGB(5, 153, 186))",
+      "row": 3,
+      "col": 0,
+      "parent_color": [
+        5,
+        153,
+        186
+      ],
+      "parent_index": 11,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        198,
+        221,
+        226
+      ],
+      "position": [
+        2487,
+        636
+      ],
+      "parent": "父颜色12(RGB(5, 153, 186))",
+      "row": 3,
+      "col": 1,
+      "parent_color": [
+        5,
+        153,
+        186
+      ],
+      "parent_index": 11,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        158,
+        181,
+        186
+      ],
+      "position": [
+        2410,
+        709
+      ],
+      "parent": "父颜色12(RGB(5, 153, 186))",
+      "row": 4,
+      "col": 0,
+      "parent_color": [
+        5,
+        153,
+        186
+      ],
+      "parent_index": 11,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        79,
+        103,
+        111
+      ],
+      "position": [
+        2487,
+        709
+      ],
+      "parent": "父颜色12(RGB(5, 153, 186))",
+      "row": 4,
+      "col": 1,
+      "parent_color": [
+        5,
+        153,
+        186
+      ],
+      "parent_index": 11,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        5,
+        94,
+        166
+      ],
+      "position": [
+        2410,
+        417
+      ],
+      "parent": "父颜色13(RGB(43, 131, 193))",
+      "row": 0,
+      "col": 0,
+      "parent_color": [
+        43,
+        131,
+        193
+      ],
+      "parent_index": 12,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        43,
+        131,
+        193
+      ],
+      "position": [
+        2487,
+        417
+      ],
+      "parent": "父颜色13(RGB(43, 131, 193))",
+      "row": 0,
+      "col": 1,
+      "parent_color": [
+        43,
+        131,
+        193
+      ],
+      "parent_index": 12,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        5,
+        71,
+        130
+      ],
+      "position": [
+        2410,
+        490
+      ],
+      "parent": "父颜色13(RGB(43, 131, 193))",
+      "row": 1,
+      "col": 0,
+      "parent_color": [
+        43,
+        131,
+        193
+      ],
+      "parent_index": 12,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        131,
+        168,
+        201
+      ],
+      "position": [
+        2487,
+        490
+      ],
+      "parent": "父颜色13(RGB(43, 131, 193))",
+      "row": 1,
+      "col": 1,
+      "parent_color": [
+        43,
+        131,
+        193
+      ],
+      "parent_index": 12,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        93,
+        128,
+        161
+      ],
+      "position": [
+        2410,
+        563
+      ],
+      "parent": "父颜色13(RGB(43, 131, 193))",
+      "row": 2,
+      "col": 0,
+      "parent_color": [
+        43,
+        131,
+        193
+      ],
+      "parent_index": 12,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        54,
+        91,
+        127
+      ],
+      "position": [
+        2487,
+        563
+      ],
+      "parent": "父颜色13(RGB(43, 131, 193))",
+      "row": 2,
+      "col": 1,
+      "parent_color": [
+        43,
+        131,
+        193
+      ],
+      "parent_index": 12,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        25,
+        59,
+        86
+      ],
+      "position": [
+        2410,
+        636
+      ],
+      "parent": "父颜色13(RGB(43, 131, 193))",
+      "row": 3,
+      "col": 0,
+      "parent_color": [
+        43,
+        131,
+        193
+      ],
+      "parent_index": 12,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        193,
+        205,
+        213
+      ],
+      "position": [
+        2487,
+        636
+      ],
+      "parent": "父颜色13(RGB(43, 131, 193))",
+      "row": 3,
+      "col": 1,
+      "parent_color": [
+        43,
+        131,
+        193
+      ],
+      "parent_index": 12,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        155,
+        166,
+        176
+      ],
+      "position": [
+        2410,
+        709
+      ],
+      "parent": "父颜色13(RGB(43, 131, 193))",
+      "row": 4,
+      "col": 0,
+      "parent_color": [
+        43,
+        131,
+        193
+      ],
+      "parent_index": 12,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        76,
+        89,
+        103
+      ],
+      "position": [
+        2487,
+        709
+      ],
+      "parent": "父颜色13(RGB(43, 131, 193))",
+      "row": 4,
+      "col": 1,
+      "parent_color": [
+        43,
+        131,
+        193
+      ],
+      "parent_index": 12,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        83,
+        77,
+        161
+      ],
+      "position": [
+        2410,
+        417
+      ],
+      "parent": "父颜色14(RGB(117, 119, 189))",
+      "row": 0,
+      "col": 0,
+      "parent_color": [
+        117,
+        119,
+        189
+      ],
+      "parent_index": 13,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        117,
+        119,
+        189
+      ],
+      "position": [
+        2487,
+        417
+      ],
+      "parent": "父颜色14(RGB(117, 119, 189))",
+      "row": 0,
+      "col": 1,
+      "parent_color": [
+        117,
+        119,
+        189
+      ],
+      "parent_index": 13,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        62,
+        56,
+        126
+      ],
+      "position": [
+        2410,
+        490
+      ],
+      "parent": "父颜色14(RGB(117, 119, 189))",
+      "row": 1,
+      "col": 0,
+      "parent_color": [
+        117,
+        119,
+        189
+      ],
+      "parent_index": 13,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        162,
+        160,
+        199
+      ],
+      "position": [
+        2487,
+        490
+      ],
+      "parent": "父颜色14(RGB(117, 119, 189))",
+      "row": 1,
+      "col": 1,
+      "parent_color": [
+        117,
+        119,
+        189
+      ],
+      "parent_index": 13,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        120,
+        122,
+        161
+      ],
+      "position": [
+        2410,
+        563
+      ],
+      "parent": "父颜色14(RGB(117, 119, 189))",
+      "row": 2,
+      "col": 0,
+      "parent_color": [
+        117,
+        119,
+        189
+      ],
+      "parent_index": 13,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        85,
+        86,
+        126
+      ],
+      "position": [
+        2487,
+        563
+      ],
+      "parent": "父颜色14(RGB(117, 119, 189))",
+      "row": 2,
+      "col": 1,
+      "parent_color": [
+        117,
+        119,
+        189
+      ],
+      "parent_index": 13,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        51,
+        53,
+        85
+      ],
+      "position": [
+        2410,
+        636
+      ],
+      "parent": "父颜色14(RGB(117, 119, 189))",
+      "row": 3,
+      "col": 0,
+      "parent_color": [
+        117,
+        119,
+        189
+      ],
+      "parent_index": 13,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        201,
+        202,
+        213
+      ],
+      "position": [
+        2487,
+        636
+      ],
+      "parent": "父颜色14(RGB(117, 119, 189))",
+      "row": 3,
+      "col": 1,
+      "parent_color": [
+        117,
+        119,
+        189
+      ],
+      "parent_index": 13,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        162,
+        163,
+        176
+      ],
+      "position": [
+        2410,
+        709
+      ],
+      "parent": "父颜色14(RGB(117, 119, 189))",
+      "row": 4,
+      "col": 0,
+      "parent_color": [
+        117,
+        119,
+        189
+      ],
+      "parent_index": 13,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        86,
+        88,
+        105
+      ],
+      "position": [
+        2487,
+        709
+      ],
+      "parent": "父颜色14(RGB(117, 119, 189))",
+      "row": 4,
+      "col": 1,
+      "parent_color": [
+        117,
+        119,
+        189
+      ],
+      "parent_index": 13,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        129,
+        61,
+        139
+      ],
+      "position": [
+        2410,
+        417
+      ],
+      "parent": "父颜色15(RGB(161, 103, 169))",
+      "row": 0,
+      "col": 0,
+      "parent_color": [
+        161,
+        103,
+        169
+      ],
+      "parent_index": 14,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        161,
+        103,
+        169
+      ],
+      "position": [
+        2487,
+        417
+      ],
+      "parent": "父颜色15(RGB(161, 103, 169))",
+      "row": 0,
+      "col": 1,
+      "parent_color": [
+        161,
+        103,
+        169
+      ],
+      "parent_index": 14,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        96,
+        43,
+        108
+      ],
+      "position": [
+        2410,
+        490
+      ],
+      "parent": "父颜色15(RGB(161, 103, 169))",
+      "row": 1,
+      "col": 0,
+      "parent_color": [
+        161,
+        103,
+        169
+      ],
+      "parent_index": 14,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        184,
+        155,
+        185
+      ],
+      "position": [
+        2487,
+        490
+      ],
+      "parent": "父颜色15(RGB(161, 103, 169))",
+      "row": 1,
+      "col": 1,
+      "parent_color": [
+        161,
+        103,
+        169
+      ],
+      "parent_index": 14,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        144,
+        115,
+        149
+      ],
+      "position": [
+        2410,
+        563
+      ],
+      "parent": "父颜色15(RGB(161, 103, 169))",
+      "row": 2,
+      "col": 0,
+      "parent_color": [
+        161,
+        103,
+        169
+      ],
+      "parent_index": 14,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        108,
+        77,
+        115
+      ],
+      "position": [
+        2487,
+        563
+      ],
+      "parent": "父颜色15(RGB(161, 103, 169))",
+      "row": 2,
+      "col": 1,
+      "parent_color": [
+        161,
+        103,
+        169
+      ],
+      "parent_index": 14,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        67,
+        46,
+        75
+      ],
+      "position": [
+        2410,
+        636
+      ],
+      "parent": "父颜色15(RGB(161, 103, 169))",
+      "row": 3,
+      "col": 0,
+      "parent_color": [
+        161,
+        103,
+        169
+      ],
+      "parent_index": 14,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        207,
+        201,
+        209
+      ],
+      "position": [
+        2487,
+        636
+      ],
+      "parent": "父颜色15(RGB(161, 103, 169))",
+      "row": 3,
+      "col": 1,
+      "parent_color": [
+        161,
+        103,
+        169
+      ],
+      "parent_index": 14,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        171,
+        161,
+        172
+      ],
+      "position": [
+        2410,
+        709
+      ],
+      "parent": "父颜色15(RGB(161, 103, 169))",
+      "row": 4,
+      "col": 0,
+      "parent_color": [
+        161,
+        103,
+        169
+      ],
+      "parent_index": 14,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        96,
+        86,
+        101
+      ],
+      "position": [
+        2487,
+        709
+      ],
+      "parent": "父颜色15(RGB(161, 103, 169))",
+      "row": 4,
+      "col": 1,
+      "parent_color": [
+        161,
+        103,
+        169
+      ],
+      "parent_index": 14,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        173,
+        53,
+        111
+      ],
+      "position": [
+        2410,
+        417
+      ],
+      "parent": "父颜色16(RGB(207, 107, 143))",
+      "row": 0,
+      "col": 0,
+      "parent_color": [
+        207,
+        107,
+        143
+      ],
+      "parent_index": 15,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        207,
+        107,
+        143
+      ],
+      "position": [
+        2487,
+        417
+      ],
+      "parent": "父颜色16(RGB(207, 107, 143))",
+      "row": 0,
+      "col": 1,
+      "parent_color": [
+        207,
+        107,
+        143
+      ],
+      "parent_index": 15,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        134,
+        38,
+        88
+      ],
+      "position": [
+        2410,
+        490
+      ],
+      "parent": "父颜色16(RGB(207, 107, 143))",
+      "row": 1,
+      "col": 0,
+      "parent_color": [
+        207,
+        107,
+        143
+      ],
+      "parent_index": 15,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        217,
+        161,
+        180
+      ],
+      "position": [
+        2487,
+        490
+      ],
+      "parent": "父颜色16(RGB(207, 107, 143))",
+      "row": 1,
+      "col": 1,
+      "parent_color": [
+        207,
+        107,
+        143
+      ],
+      "parent_index": 15,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        180,
+        122,
+        140
+      ],
+      "position": [
+        2410,
+        563
+      ],
+      "parent": "父颜色16(RGB(207, 107, 143))",
+      "row": 2,
+      "col": 0,
+      "parent_color": [
+        207,
+        107,
+        143
+      ],
+      "parent_index": 15,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        139,
+        83,
+        103
+      ],
+      "position": [
+        2487,
+        563
+      ],
+      "parent": "父颜色16(RGB(207, 107, 143))",
+      "row": 2,
+      "col": 1,
+      "parent_color": [
+        207,
+        107,
+        143
+      ],
+      "parent_index": 15,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        96,
+        53,
+        75
+      ],
+      "position": [
+        2410,
+        636
+      ],
+      "parent": "父颜色16(RGB(207, 107, 143))",
+      "row": 3,
+      "col": 0,
+      "parent_color": [
+        207,
+        107,
+        143
+      ],
+      "parent_index": 15,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        228,
+        213,
+        218
+      ],
+      "position": [
+        2487,
+        636
+      ],
+      "parent": "父颜色16(RGB(207, 107, 143))",
+      "row": 3,
+      "col": 1,
+      "parent_color": [
+        207,
+        107,
+        143
+      ],
+      "parent_index": 15,
+      "is_parent": false
+    },
+    {
+      "rgb": [
+        188,
+        173,
+        177
+      ],
+      "position": [
+        2410,
+        709
+      ],
+      "parent": "父颜色16(RGB(207, 107, 143))",
+      "row": 4,
+      "col": 0,
+      "parent_color": [
+        207,
+        107,
+        143
+      ],
+      "parent_index": 15,
+      "is_parent": false
+    }
+  ],
+  "aspect_ratio_and_size": {
+    "aspect_ratio": "3:4",
+    "size": "114个格子"
+  },
+  "save_time": "2025-09-02 23:23:21"
+}

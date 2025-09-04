@@ -7,7 +7,6 @@
 import logging
 import time
 import ctypes
-import random
 from ctypes import wintypes, Structure, c_long
 
 # Windows API 结构体定义
@@ -64,69 +63,7 @@ class ClickUtils:
         except Exception as e:
             logging.error(f"点击位置{position}失败: {e}")
             return False
-    
-    def drag_draw_line(self, start_position, end_position, steps=10):
-        """拖动绘制直线，从起始位置拖动到结束位置（优化版）"""
-        try:
-            # 检查延迟值是否已设置
-            if self.move_delay is None or self.draw_delay is None:
-                raise ValueError("延迟值未设置，请先调用set_delays方法")
-                
-            import time
-            start_time = time.time()
-            
-            start_x, start_y = int(start_position[0]), int(start_position[1])
-            end_x, end_y = int(end_position[0]), int(end_position[1])
-            
-            logging.info(f"开始拖动绘制: 从({start_x}, {start_y})到({end_x}, {end_y})，共{steps}步")
-            
-            # 计算步长
-            step_x = (end_x - start_x) / steps
-            step_y = (end_y - start_y) / steps
-            
-            logging.debug(f"拖动步长：x={step_x:.2f}, y={step_y:.2f}")
-            
-            # 确保最后一步到达结束位置
-            logging.debug(f"拖动范围：从({start_x}, {start_y})到({end_x}, {end_y})，距离{end_x - start_x}像素")
-            
-            # 移动到起始位置
-            self._send_mouse_input(start_x, start_y, MOUSEEVENTF_MOVE)
-            time.sleep(self.move_delay)  # 使用UI设置的移动延迟
-            
-            # 按下鼠标左键
-            self._send_mouse_input(start_x, start_y, MOUSEEVENTF_LEFTDOWN)
-            time.sleep(self.draw_delay)  # 使用UI设置的绘图延迟
-            
-            # 逐步拖动到结束位置
-            for i in range(1, steps + 1):
-                if i == steps:
-                    # 最后一步确保到达结束位置
-                    current_x = end_x
-                    current_y = end_y
-                else:
-                    current_x = int(start_x + step_x * i)
-                    current_y = int(start_y + step_y * i)
-                
-                # 移动到当前位置
-                self._send_mouse_input(current_x, current_y, MOUSEEVENTF_MOVE)
-                # 添加拖动过程中的延迟，让拖动过程更明显
-                time.sleep(self.move_delay)  # 使用UI设置的移动延迟
-            
-            # 在结束位置松开鼠标左键
-            self._send_mouse_input(end_x, end_y, MOUSEEVENTF_LEFTUP)
-            time.sleep(self.draw_delay)  # 使用UI设置的绘图延迟
-            
-            end_time = time.time()
-            drag_time = end_time - start_time
-            logging.info(f"拖动绘制完成: 从({start_x}, {start_y})到({end_x}, {end_y})，共{steps}步，耗时{drag_time:.3f}秒")
-            return True
-            
-        except Exception as e:
-            logging.error(f"拖动绘制失败: {e}")
-            return False
-    
 
-    
     def _click_position_winapi(self, position):
         """使用Windows API点击位置，包含多种点击方法和重试机制"""
         try:
@@ -248,7 +185,3 @@ click_utils = ClickUtils()
 def click_position(position):
     """便捷的点击位置函数"""
     return click_utils.click_position(position)
-
-def drag_draw_line(start_position, end_position, steps=10):
-    """便捷的拖动绘制函数"""
-    return click_utils.drag_draw_line(start_position, end_position, steps)

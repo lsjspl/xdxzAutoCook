@@ -4,22 +4,25 @@
 绘图助手主程序
 从钓鱼助手改造而来，实现自动绘图功能
 """
-
 import sys
 import os
-import logging
-import traceback
-from PyQt5.QtWidgets import QApplication, QMessageBox
-from PyQt5.QtCore import QObject
-
 # 添加项目根目录到路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from common import isAdmin
-
 # 导入绘图模块
 from paint_ui import PaintMainUI, setup_logging
 from paint_business import PaintBusiness
 from paint_worker import DrawingWorker, HotkeyWorker
+
+import logging
+import traceback
+from PyQt5.QtWidgets import QApplication, QMessageBox,QFileDialog
+from PyQt5.QtCore import QObject
+from screen_cropper import crop_screen_region, crop_point_region
+
+
+
+
 
 
 class PaintAppController(QObject):
@@ -115,7 +118,6 @@ class PaintAppController(QObject):
     def _on_select_draw_area(self):
         """处理选择绘画区域请求"""
         try:
-            from screen_cropper import crop_screen_region, crop_point_region
             
             # 清除之前的绘画区域显示
             self._clear_draw_area_display()
@@ -136,7 +138,7 @@ class PaintAppController(QObject):
                     self._current_cropper = None
             
             # 询问用户选择方式
-            from PyQt5.QtWidgets import QMessageBox
+            
             
             msg_box = QMessageBox()
             msg_box.setWindowTitle("选择绘图区域方式")
@@ -172,7 +174,6 @@ class PaintAppController(QObject):
     def _on_select_parent_color_area(self):
         """处理选择父颜色区域请求"""
         try:
-            from screen_cropper import crop_screen_region
             
             def on_crop_finished(img, position):
                 if img and position:
@@ -197,7 +198,6 @@ class PaintAppController(QObject):
     def _on_select_color_palette_button(self):
         """处理选择色盘按钮请求"""
         try:
-            from screen_cropper import crop_screen_region
             
             def on_crop_finished(img, position):
                 if img and position:
@@ -222,7 +222,6 @@ class PaintAppController(QObject):
     def _on_select_color_swatch_return_button(self):
         """处理选择色板返回按钮请求"""
         try:
-            from screen_cropper import crop_screen_region
             
             def on_crop_finished(img, position):
                 if img and position:
@@ -247,7 +246,6 @@ class PaintAppController(QObject):
     def _on_select_child_color_area(self):
         """处理选择子颜色区域请求"""
         try:
-            from screen_cropper import crop_screen_region
             
             def on_crop_finished(img, position):
                 if img and position:
@@ -272,7 +270,6 @@ class PaintAppController(QObject):
     def _on_select_background_color_button(self):
         """处理选择背景色按钮请求"""
         try:
-            from screen_cropper import crop_screen_region
             
             def on_crop_finished(img, position):
                 if img and position:
@@ -367,7 +364,6 @@ class PaintAppController(QObject):
     def _on_select_image(self):
         """处理选择图片请求"""
         try:
-            from PyQt5.QtWidgets import QFileDialog
             
             file_path, _ = QFileDialog.getOpenFileName(
                 self.ui,
@@ -419,9 +415,12 @@ class PaintAppController(QObject):
     def _on_process_image(self, aspect_ratio, size_text):
         """处理图片处理请求"""
         try:
-            success = self.business.process_image(aspect_ratio, size_text)
+            # 从UI获取具体的width和height配置
+            ratio_text, size_text, width, height = self.ui.get_size_info()
+            
+            success = self.business.process_image_with_dimensions(aspect_ratio, size_text, width, height)
             if success:
-                self.ui.update_status_text("图片处理完成")
+                self.ui.update_status_text(f"图片处理完成，尺寸: {width}×{height}")
                 # 检查是否可以开始绘图
                 self._check_drawing_ready()
             else:
@@ -597,7 +596,7 @@ class PaintAppController(QObject):
             logging.debug("绘图启动完成")
         except Exception as e:
             logging.error(f"启动绘图失败: {e}")
-            import traceback
+            
             traceback.print_exc()
             self.ui.update_status_text(f"启动绘图失败: {str(e)}")
     
@@ -702,6 +701,45 @@ class PaintAppController(QObject):
         except Exception as e:
             logging.error(f"检查绘图就绪状态失败: {e}")
     
+    def _clear_pixelized_data_only(self):
+        """只清空像素画相关数据，保留图片选择"""
+        try:
+            logging.info("清空像素画相关数据，保留图片选择")
+            
+            # 清理业务逻辑中的像素化相关数据
+            if hasattr(self.business, 'pixel_info_list'):
+                self.business.pixel_info_list = []
+                logging.info("已清理像素信息列表")
+            
+            if hasattr(self.business, 'pixelized_image'):
+                self.business.pixelized_image = None
+                logging.info("已清理像素化图片")
+            
+            # 清理UI中的像素化相关数据
+            if hasattr(self.ui, 'pixelized_image'):
+                self.ui.pixelized_image = None
+            
+            if hasattr(self.ui, 'pixel_info_list'):
+                self.ui.pixel_info_list = []
+            
+            # 更新UI显示
+            if hasattr(self.ui, 'pixelized_image_label'):
+                self.ui.pixelized_image_label.setText("请先处理图片")
+            
+            # 检查是否有图片选择，如果有则启用处理图片按钮
+            if hasattr(self.ui, 'process_image_btn'):
+                if hasattr(self.ui, 'selected_image_path') and self.ui.selected_image_path:
+                    self.ui.process_image_btn.setEnabled(True)
+                    self.ui.update_status_text("配置已加载，请重新处理图片以应用新配置")
+                else:
+                    self.ui.process_image_btn.setEnabled(False)
+                    self.ui.update_status_text("配置已加载，请先选择图片")
+            
+            logging.info("像素画相关数据已清空")
+            
+        except Exception as e:
+            logging.error(f"清空像素画数据失败: {e}")
+    
     def _reset_drawing_state(self):
         """重置绘图状态，清理可能导致第二次绘图问题的数据"""
         try:
@@ -730,7 +768,6 @@ class PaintAppController(QObject):
             # 验证配置名称
             is_valid, error_msg = self.ui.validate_config_name(config_name)
             if not is_valid:
-                from PyQt5.QtWidgets import QMessageBox
                 QMessageBox.warning(self.ui, '保存配置', error_msg)
                 return
             
@@ -747,7 +784,6 @@ class PaintAppController(QObject):
                 # 清空配置名称输入框
                 self.ui.clear_config_name()
             else:
-                from PyQt5.QtWidgets import QMessageBox
                 QMessageBox.warning(self.ui, '保存配置', '配置保存失败，请检查设置')
                 
         except Exception as e:
@@ -759,7 +795,6 @@ class PaintAppController(QObject):
         try:
             config_name = self.ui.config_combo.currentText()
             if not config_name:
-                from PyQt5.QtWidgets import QMessageBox
                 QMessageBox.warning(self.ui, '加载配置', '请选择要加载的配置')
                 return
             
@@ -773,7 +808,6 @@ class PaintAppController(QObject):
                 # 更新绘画区域显示
                 self._update_draw_area_display()
             else:
-                from PyQt5.QtWidgets import QMessageBox
                 QMessageBox.warning(self.ui, '加载配置', '配置加载失败，请检查配置文件')
                 
         except Exception as e:
@@ -785,12 +819,9 @@ class PaintAppController(QObject):
         try:
             config_name = self.ui.config_combo.currentText()
             if not config_name:
-                from PyQt5.QtWidgets import QMessageBox
                 QMessageBox.warning(self.ui, '删除配置', '请选择要删除的配置')
                 return
             
-            # 确认删除
-            from PyQt5.QtWidgets import QMessageBox
             reply = QMessageBox.question(
                 self.ui, 
                 '确认删除', 
@@ -883,13 +914,13 @@ class PaintAppController(QObject):
             else:
                 logging.info("配置中没有比例和尺寸信息")
             
-            # 注意：不再从配置中恢复图片路径，用户需要重新选择图片
-            # selected_image_path = self.business.get_selected_image_path()
-            # if selected_image_path:
-            #     self.ui.set_selected_image(selected_image_path)  # 已移除
+            # 恢复图片选择到business中（如果UI中有图片选择）
+            if hasattr(self.ui, 'selected_image_path') and self.ui.selected_image_path:
+                self.business.set_selected_image(self.ui.selected_image_path)
+                logging.info(f"已恢复图片选择到business: {self.ui.selected_image_path}")
             
-            # 清空UI中的图片显示，确保用户重新选择图片
-            self.ui.set_selected_image(None)
+            # 清空像素画相关数据，但保留图片选择
+            self._clear_pixelized_data_only()
             
             # 更新绘画区域显示
             self._update_draw_area_display()

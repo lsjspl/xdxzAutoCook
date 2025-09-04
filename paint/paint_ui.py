@@ -11,14 +11,16 @@ import logging
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QComboBox, QGroupBox, QMessageBox,
-    QFileDialog, QSpinBox, QTextEdit, QScrollArea, QFormLayout,
-    QGridLayout, QFrame, QSizePolicy, QDoubleSpinBox, QLineEdit,
+    QTextEdit, QScrollArea, QFormLayout,
+    QGridLayout, QFrame, QSizePolicy, QDoubleSpinBox,
     QCheckBox, QProgressBar
 )
-from PyQt5.QtGui import QPixmap, QImage, QFont, QPainter, QPen, QColor, QKeySequence
-from PyQt5.QtCore import Qt, pyqtSignal, QRect, QTimer
+from PyQt5.QtGui import QPixmap, QImage, QFont, QPainter, QPen, QColor
+from PyQt5.QtCore import Qt, pyqtSignal
 from PIL import Image
-
+from pixel_overlay import PixelOverlay
+import traceback
+import re
 
 def setup_logging():
     """设置日志配置"""
@@ -162,6 +164,64 @@ class PaintMainUI(QWidget):
         self.color_palette = []
         self.collected_colors = []
         self.pixel_info_list = []
+        
+        # 尺寸配置变量 - 可配置的比例和格子数
+        self.size_configs = {
+            "1:1": [
+                {"name": "30个格子", "width": 30, "height": 30},
+                {"name": "50个格子", "width": 50, "height": 50},
+                {"name": "100个格子", "width": 100, "height": 100},
+                {"name": "150个格子", "width": 150, "height": 150}
+            ],
+            "16:9": [
+                {"name": "30个格子", "width": 30, "height": 18},  
+                {"name": "50个格子", "width": 50, "height": 28},  
+                {"name": "100个格子", "width": 100, "height": 56}, 
+                {"name": "150个格子", "width": 150, "height": 84}   
+            ],
+            "4:3": [
+                {"name": "30个格子", "width": 30, "height": 24},  
+                {"name": "50个格子", "width": 50, "height": 38},  
+                {"name": "100个格子", "width": 100, "height": 76},  
+                {"name": "150个格子", "width": 150, "height": 114}  
+            ],
+            "3:4": [
+                {"name": "24个格子", "width": 24, "height": 30},  
+                {"name": "38个格子", "width": 38, "height": 50}, 
+                {"name": "76个格子", "width": 76, "height": 100},
+                {"name": "114个格子", "width": 114, "height": 150} 
+            ],
+            "9:16": [
+                {"name": "18个格子", "width": 18, "height": 30},  
+                {"name": "28个格子", "width": 28, "height": 50}, 
+                {"name": "56个格子", "width": 56, "height": 100}, 
+                {"name": "84个格子", "width": 84, "height": 150}  
+            ],
+            "衬衣": [
+                {"name": "前片", "width": 64, "height": 90},
+                {"name": "后片", "width": 64, "height": 90},
+                {"name": "左袖片", "width": 64, "height": 48},
+                {"name": "右袖片", "width": 64, "height": 48}
+            ],
+            "背心": [
+                {"name": "前片", "width": 64, "height": 64}, 
+                {"name": "后片", "width": 64, "height": 64},
+            ],
+            "短裙": [
+                {"name": "前片", "width": 128, "height": 64},  
+                {"name": "后片", "width": 128, "height": 64},
+            ],
+            "短裤": [
+                {"name": "前片", "width": 102, "height": 64},
+                {"name": "后片", "width": 102, "height": 64},
+
+            ],
+            "帽子": [
+                {"name": "前帽檐", "width": 126, "height": 78},  
+                {"name": "后帽檐", "width": 126, "height": 78},  
+                {"name": "帽顶", "width": 100, "height": 100}, 
+            ]
+        }
         
 
         
@@ -365,7 +425,8 @@ class PaintMainUI(QWidget):
         
         # 图片比例选择
         self.aspect_ratio_combo = QComboBox()
-        self.aspect_ratio_combo.addItems(["1:1", "16:9", "4:3", "3:4", "9:16"])
+        # 动态添加所有配置中的比例选项
+        self._update_aspect_ratio_options()
         self.aspect_ratio_combo.setCurrentText("1:1")
         
         # 尺寸选择
@@ -661,7 +722,7 @@ class PaintMainUI(QWidget):
         self.progress_label.setStyleSheet("color: #666; font-size: 12px;")
         
         progress_layout.addWidget(self.progress_bar)
-        progress_layout.addWidget(self.progress_label)
+        # progress_layout.addWidget(self.progress_label)
         progress_group.setLayout(progress_layout)
         
         # 状态显示
@@ -966,8 +1027,7 @@ class PaintMainUI(QWidget):
             # 同时输出到日志
             logging.info(f"像素调试信息: {debug_text}")
             
-            # 询问用户是否要在绘画区域显示像素点
-            from PyQt5.QtWidgets import QMessageBox
+
             reply = QMessageBox.question(
                 self, 
                 '显示像素点', 
@@ -997,7 +1057,7 @@ class PaintMainUI(QWidget):
             self.update_status_text(f"正在创建像素点overlay，共{len(pixel_info_list)}个像素点...")
             
             # 创建像素点overlay窗口
-            from pixel_overlay import PixelOverlay
+
             self.pixel_overlay = PixelOverlay(
                 pixel_info_list=pixel_info_list,
                 draw_area_pos=self.draw_area_pos
@@ -1153,18 +1213,12 @@ class PaintMainUI(QWidget):
         """根据比例更新尺寸选项"""
         ratio = self.aspect_ratio_combo.currentText()
         
-        # 根据比例设置不同的尺寸选项
-        if ratio in ["16:9", "4:3", "1:1"]:
-            # 16:9, 4:3, 1:1 使用相同的尺寸选项
-            sizes = ["30个格子", "50个格子", "100个格子", "150个格子"]
-        elif ratio == "3:4":
-            # 3:4 使用不同的尺寸选项
-            sizes = ["24个格子", "38个格子", "76个格子", "114个格子"]
-        elif ratio == "9:16":
-            # 9:16 使用不同的尺寸选项
-            sizes = ["18个格子", "28个格子", "56个格子", "84个格子"]
+        # 从配置变量中获取尺寸选项
+        if ratio in self.size_configs:
+            size_configs = self.size_configs[ratio]
+            sizes = [config["name"] for config in size_configs]
         else:
-            # 默认选项
+            # 默认选项（如果比例不在配置中）
             sizes = ["30个格子", "50个格子", "100个格子", "150个格子"]
         
         # 保存当前选择
@@ -1185,15 +1239,15 @@ class PaintMainUI(QWidget):
         ratio_text = self.aspect_ratio_combo.currentText()
         size_text = self.size_combo.currentText()
         
-        # 从尺寸文本中提取数字
-        import re
-        size_match = re.search(r'(\d+)个格子', size_text)
-        if size_match:
-            grid_count = int(size_match.group(1))
-        else:
-            grid_count = 100  # 默认值
+        # 从配置变量中获取尺寸信息
+        if ratio_text in self.size_configs:
+            size_configs = self.size_configs[ratio_text]
+            for config in size_configs:
+                if config["name"] == size_text:
+                    return ratio_text, size_text, config["width"], config["height"]
         
-        return ratio_text, size_text, grid_count
+        # 如果配置中找不到，使用默认值
+        return ratio_text, size_text, 100, 100
     
     def get_aspect_ratio_and_size(self):
         """获取当前选择的比例和尺寸信息（用于配置保存）"""
@@ -1214,7 +1268,6 @@ class PaintMainUI(QWidget):
                 # 比例改变会自动更新尺寸选项
                 
                 # 等待一下让尺寸选项更新
-                import time
                 time.sleep(0.1)
                 
                 # 设置尺寸
@@ -1241,7 +1294,7 @@ class PaintMainUI(QWidget):
                 return False
         except Exception as e:
             logging.error(f"设置比例和尺寸失败: {e}")
-            import traceback
+      
             logging.error(traceback.format_exc())
             return False
     
@@ -1261,7 +1314,9 @@ class PaintMainUI(QWidget):
         try:
             if total > 0:
                 percentage = int((current / total) * 100)
-                self.progress_bar.setValue(percentage)
+                # 确保进度条范围是0-100，然后设置百分比值
+                self.progress_bar.setRange(0, total)
+                self.progress_bar.setValue(current)
                 
                 # 更新进度标签
                 self.progress_label.setText(f"正在绘制: {current}/{total} ({percentage}%)")
@@ -1282,6 +1337,7 @@ class PaintMainUI(QWidget):
     def reset_progress_bar(self):
         """重置进度条"""
         try:
+            self.progress_bar.setRange(0, 100)
             self.progress_bar.setValue(0)
             self.progress_label.setText("等待开始绘图...")
             self.progress_bar.setStyleSheet("")
@@ -1289,9 +1345,10 @@ class PaintMainUI(QWidget):
             logging.error(f"重置进度条失败: {e}")
     
     def set_progress_bar_max(self, max_value):
-        """设置进度条最大值"""
+        """设置进度条最大值（实际上只是重置进度条状态）"""
         try:
-            self.progress_bar.setMaximum(max_value)
+            # 进度条始终使用0-100的范围显示百分比
+            self.progress_bar.setRange(0, 100)
             self.progress_bar.setValue(0)
             self.progress_label.setText(f"准备绘制: 0/{max_value} (0%)")
         except Exception as e:
@@ -1368,7 +1425,6 @@ class PaintMainUI(QWidget):
             
         except Exception as e:
             logging.error(f"显示收集到的颜色失败: {e}")
-            import traceback
             traceback.print_exc()
             self.update_status_text(f"显示收集到的颜色失败: {str(e)}")
     
@@ -1692,7 +1748,6 @@ class PaintMainUI(QWidget):
         except Exception as e:
             error_msg = f"set_collected_colors 失败: {e}"
             logging.error(error_msg)
-            import traceback
             logging.error(f"详细错误信息: {traceback.format_exc()}")
             # 显示错误信息给用户
             self.update_status_text(f"设置收集到的颜色失败: {str(e)}")
@@ -1747,7 +1802,7 @@ class PaintMainUI(QWidget):
             return False, "配置名称不能超过50个字符"
         
         # 检查是否包含非法字符
-        import re
+        
         if re.search(r'[<>:"/\\|?*]', config_name):
             return False, "配置名称不能包含以下字符: < > : \" / \\ | ? *"
         
@@ -1776,6 +1831,92 @@ class PaintMainUI(QWidget):
     def clear_config_name(self):
         """清空配置名称"""
         self.config_combo.clearEditText()
+    
+    # 尺寸配置管理方法
+    def get_size_configs(self):
+        """获取所有尺寸配置"""
+        return self.size_configs
+    
+    def set_size_configs(self, configs):
+        """设置尺寸配置"""
+        self.size_configs = configs
+        # 更新比例下拉框选项
+        self._update_aspect_ratio_options()
+        # 重新初始化尺寸选项
+        self.update_size_options()
+    
+    def add_size_config(self, ratio, name, width, height=None):
+        """添加新的尺寸配置"""
+        is_new_ratio = ratio not in self.size_configs
+        
+        if is_new_ratio:
+            self.size_configs[ratio] = []
+        
+        # 如果没有指定高度，根据比例自动计算
+        if height is None:
+            height = self._calculate_height_by_ratio(ratio, width)
+        
+        config = {"name": name, "width": width, "height": height}
+        self.size_configs[ratio].append(config)
+        
+        # 如果是新比例，更新比例下拉框
+        if is_new_ratio:
+            self._update_aspect_ratio_options()
+        
+        # 如果当前比例匹配，更新尺寸选项
+        if self.aspect_ratio_combo.currentText() == ratio:
+            self.update_size_options()
+    
+    def remove_size_config(self, ratio, name):
+        """删除尺寸配置"""
+        if ratio in self.size_configs:
+            self.size_configs[ratio] = [config for config in self.size_configs[ratio] if config["name"] != name]
+            
+            # 如果当前比例匹配，更新选项
+            if self.aspect_ratio_combo.currentText() == ratio:
+                self.update_size_options()
+    
+    def update_size_config(self, ratio, old_name, new_name, width, height=None):
+        """更新尺寸配置"""
+        if ratio in self.size_configs:
+            for config in self.size_configs[ratio]:
+                if config["name"] == old_name:
+                    config["name"] = new_name
+                    config["width"] = width
+                    if height is None:
+                        height = self._calculate_height_by_ratio(ratio, width)
+                    config["height"] = height
+                    break
+            
+            # 如果当前比例匹配，更新选项
+            if self.aspect_ratio_combo.currentText() == ratio:
+                self.update_size_options()
+    
+    def _calculate_height_by_ratio(self, ratio, width):
+        """根据比例自动计算高度"""
+        ratio_map = {
+            "1:1": (1, 1),
+            "16:9": (16, 9),
+            "4:3": (4, 3),
+            "3:4": (3, 4),
+            "9:16": (9, 16)
+        }
+        
+        if ratio in ratio_map:
+            width_ratio, height_ratio = ratio_map[ratio]
+            height = int(width * height_ratio / width_ratio)
+            return height
+        
+        return width  # 默认返回相同值
+    
+    def _update_aspect_ratio_options(self):
+        """更新比例下拉框选项"""
+        # 获取所有配置中的比例选项
+        ratios = list(self.size_configs.keys())
+        
+        # 清空并重新添加选项
+        self.aspect_ratio_combo.clear()
+        self.aspect_ratio_combo.addItems(ratios)
     
     def show_draw_area_position(self, pos, size):
         """显示绘画区域位置"""
@@ -1899,11 +2040,3 @@ class DetectionOverlay(QWidget):
             # 绘制文本
             painter.setPen(QColor(0, 255, 0))
             painter.drawText(text_rect, Qt.AlignCenter, text)
-
-
-if __name__ == "__main__":
-    import time
-    app = QApplication(sys.argv)
-    window = PaintMainUI()
-    window.show()
-    sys.exit(app.exec_())
